@@ -3,8 +3,8 @@
 // 필요한 비밀값(Secrets): ANTHROPIC_API_KEY, APP_TOKEN
 // 배포: supabase functions deploy kid-tutor --no-verify-jwt
 
-const MODEL = "claude-opus-5";
-// Opus 5는 생각(thinking)이 기본으로 켜져 있고 max_tokens에 생각이 포함된다. 답 길이는 프롬프트로 조절한다.
+const MODEL = "claude-sonnet-5";
+// Sonnet 5는 생각(thinking)이 기본으로 켜져 있고 max_tokens에 생각이 포함된다. 답 길이는 프롬프트로 조절한다.
 const MAX_TOKENS = 2000;
 const REFUSED = "그건 척척이가 대답하기 어려운 이야기예요. 엄마 아빠께 여쭤보자!";
 const CORS = {
@@ -93,15 +93,10 @@ Deno.serve(async (req) => {
 
   const r = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
-    headers: {
-      "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json",
-      // 안전 분류기가 거절하면 서버에서 알맞은 모델로 다시 시도한다
-      "anthropic-beta": "server-side-fallback-2026-07-01",
-    },
+    headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
     body: JSON.stringify({
       model: MODEL, max_tokens: MAX_TOKENS, system, messages,
       output_config: { effort: "low" }, // 짧은 대화라 가볍게 생각하게 한다
-      fallbacks: "default",
     }),
   });
   if (!r.ok) return bad(502, "ai error " + r.status);

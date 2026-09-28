@@ -103,6 +103,29 @@ h1,h2,h3,.disp{font-family:var(--display);font-weight:400;margin:0;text-wrap:bal
 .linkrow .disp{font-size:18px;color:var(--brand)}
 .linkrow small{color:var(--muted);font-size:14px}
 .linkrow:focus-visible{outline:3px solid var(--coin);outline-offset:2px}
+/* 출석 도장 */
+.attend{display:flex;flex-direction:column;gap:8px;padding:12px 16px}
+.stamps{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.stamp{display:flex;flex-direction:column;align-items:center;gap:2px}
+.stamp b{width:34px;height:34px;border-radius:50%;border:2px dashed var(--line);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--brand-ink)}
+.stamp.on b{border:0;background:var(--kor);transform:rotate(-8deg)}
+.stamp.today b{border-color:var(--coin)}
+.stamp small{font-size:12px;color:var(--muted)}
+/* 우주 스티커 */
+.stk-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.stk{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 4px;border-radius:16px;background:#162447;color:#fff;border:2px solid #2b3d6b;min-height:48px;font-family:var(--display);font-size:16px}
+.stk img{width:72px;height:72px}
+.stk.none img{filter:brightness(0) opacity(.35)}
+.stk.none span{color:#9aa6c4}
+.stk small{position:absolute;top:6px;right:8px;font-size:13px;color:var(--coin)}
+.stk-pop{position:fixed;inset:0;z-index:50;background:rgba(10,20,40,.55);display:flex;align-items:center;justify-content:center;padding:16px}
+.stk-card{background:var(--panel);border-radius:22px;padding:20px;max-width:320px;width:100%;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;animation:stkIn .35s ease-out}
+@keyframes stkIn{from{transform:scale(.7);opacity:0}}
+@media (prefers-reduced-motion:reduce){.stk-card{animation:none}}
+/* 리포트 */
+.rbar{display:grid;grid-template-columns:64px 1fr 72px;gap:8px;align-items:center;font-size:15px}
+.rbar .bar{height:10px}
+
 /* 게임 놀이터 */
 .gcard{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:12px 14px;border-radius:var(--radius);background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow);min-height:72px}
 .gcard img{width:52px;height:52px;flex:none}
@@ -291,7 +314,7 @@ const SPACE_WONDERS = [
   '목성에 있는 커다란 빨간 점은 무엇일까?', '밤하늘에서 행성과 별은 어떻게 구별할 수 있을까?', '블랙홀은 왜 까맣게 보일까?', '수성은 태양과 가장 가까운데, 왜 금성이 더 뜨거울까?',
   '달은 왜 늘 같은 얼굴만 보여 줄까?', '해왕성(Neptune)은 왜 파랗게 보일까?', '우주에서 지구를 보면 어떤 모습일까?', '태양도 별이라는데, 왜 다른 별보다 훨씬 크고 밝아 보일까?',
 ];
-const DEF_SETTINGS = { name:'우리 딸', grade:2, sem:2, review:true, reward:{1:10,2:30,3:50}, comboBonus:50, penalty:0, dailyCap:1000, goal:5000, pin:'0000', aiUrl:'', aiToken:'', aiDaily:20, petCap:200, links:DEF_LINKS, likes:'우주, 태양계 행성' };
+const DEF_SETTINGS = { name:'우리 딸', grade:2, sem:2, review:true, reward:{1:10,2:30,3:50}, comboBonus:50, penalty:0, dailyCap:1000, goal:5000, pin:'0000', aiUrl:'', aiToken:'', aiDaily:20, petCap:200, links:DEF_LINKS, likes:'우주, 태양계 행성', sound:true, gameCap:10 };
 const DEF_PET = { exp:0, full:100, lastDay:'', owned:[], wear:[], dex:[] };
 let S;
 function load(){
@@ -301,15 +324,97 @@ function load(){
   S.settings.reward = Object.assign({}, DEF_SETTINGS.reward, S.settings.reward || {});
   S.pet = Object.assign({}, DEF_PET, S.pet || {});
   S.games = Object.assign({ best:{} }, S.games || {});
+  S.attend = Object.assign({ days:[], last:'', streak:0, best:0 }, S.attend || {}); // 출석 도장
+  S.stickers = S.stickers || {};   // 우주 스티커 { planetId: 받은 장수 }
+  S.report = S.report || {};       // 날짜별 과목 기록 { 'YYYY-MM-DD': { math:[푼 수, 맞힌 수] } }
+  S.units = S.units || {};         // 단원별 누적 { 'math|단원': [푼 수, 맞힌 수] }
+  const keep = new Date(Date.now() - 60 * 86400000).toISOString().slice(0, 10);
+  for (const k of Object.keys(S.report)) if (k < keep) delete S.report[k];
   S.settings.links = (Array.isArray(S.settings.links) ? S.settings.links : DEF_LINKS).map((l) => Object.assign({}, l));
   if (!raw) S.ledger.push({ t:Date.now(), memo:'통장 만들기', in:0, out:0, bal:0 });
 }
 function save(){ try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e) {} }
-function daily(){ if (S.daily.date !== today()) S.daily = { date:today(), earned:0, ai:0, spent:0, games:{} }; return S.daily; }
+function daily(){ if (S.daily.date !== today()) S.daily = { date:today(), earned:0, ai:0, spent:0, games:{}, plays:0, stickers:0 }; return S.daily; }
 function addLedger(memo, amt){ S.ledger.push({ t:Date.now(), memo, in:amt>0?amt:0, out:amt<0?-amt:0, bal:S.balance }); if (S.ledger.length > 300) S.ledger = S.ledger.slice(-300); }
 
 function toast(msg){ const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => t.hidden = true, 2200); }
-function popCoin(text){ const d = document.createElement('div'); d.className = 'pop'; d.textContent = text; document.body.appendChild(d); setTimeout(() => d.remove(), 1100); }
+function popCoin(text){ const d = document.createElement('div'); d.className = 'pop'; d.textContent = text; document.body.appendChild(d); setTimeout(() => d.remove(), 1100); sfx('coin'); }
+
+// ───── 효과음 (파일 없이 Web Audio로 만든다) ─────
+let AC = null;
+const SFX = {
+  ok:   [[880, 0, .12], [1320, .1, .2]],
+  no:   [[247, 0, .16], [196, .12, .22]],
+  coin: [[1568, 0, .07], [2093, .07, .14]],
+  tap:  [[660, 0, .06]],
+  win:  [[523, 0, .12], [659, .1, .12], [784, .2, .12], [1047, .3, .3]],
+};
+function sfx(kind){
+  if (!S.settings.sound || !SFX[kind]) return;
+  try {
+    AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+    if (AC.state === 'suspended') AC.resume();
+    const t = AC.currentTime;
+    for (const [f, st, du] of SFX[kind]) {
+      const o = AC.createOscillator(), g = AC.createGain();
+      o.type = kind === 'no' ? 'triangle' : 'sine'; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t + st); g.gain.exponentialRampToValueAtTime(0.16, t + st + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + st + du);
+      o.connect(g).connect(AC.destination); o.start(t + st); o.stop(t + st + du + 0.02);
+    }
+  } catch (e) { /* 소리가 안 나도 앱은 그대로 */ }
+}
+
+// ───── 우주 스티커 ─────
+const STICKER_DAILY = 3;
+// 스티커 한 장 주기: 아직 없는 것을 먼저. 하루 STICKER_DAILY장까지. 받은 행성(또는 null)을 돌려준다
+function grantSticker(){
+  const d = daily(); d.stickers = d.stickers || 0;
+  if (d.stickers >= STICKER_DAILY) return null;
+  const all = window.GameData.PLANETS, missing = all.filter((p) => !S.stickers[p.id]);
+  const p = (missing.length ? missing : all)[Math.floor(Math.random() * (missing.length || all.length))];
+  S.stickers[p.id] = (S.stickers[p.id] || 0) + 1; d.stickers++; save();
+  setTimeout(() => showSticker(p, S.stickers[p.id] === 1), 400);
+  return p;
+}
+function showSticker(p, isNew){
+  const el = document.createElement('div'); el.className = 'stk-pop'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', '우주 스티커를 받았어요');
+  el.innerHTML = `<div class="stk-card"><div class="eyebrow">${isNew ? '새 우주 스티커!' : '우주 스티커 한 장 더!'}</div>
+    <img src="img/planet/${p.id}.webp" alt="" width="140" height="140"><div class="disp" style="font-size:26px">${p.ko} <small class="note">${p.en}</small></div>
+    <p style="margin:0">${esc(p.fact)}</p><button class="btn primary block">좋아요!</button></div>`;
+  document.body.appendChild(el); sfx('win');
+  const close = () => el.remove(); el.querySelector('button').onclick = close; el.onclick = (e) => { if (e.target === el) close(); };
+  el.querySelector('button').focus();
+}
+function stickerView(){
+  const all = window.GameData.PLANETS, have = all.filter((p) => S.stickers[p.id]).length;
+  $('#view').innerHTML = `<div class="card" style="display:flex;flex-direction:column;gap:12px">
+    <h2 style="font-size:24px">우주 스티커 도감</h2>
+    <p>${have} / ${all.length}장 모았어요${have === all.length ? ' · <b>태양계 박사 달성!</b>' : ''}</p>
+    <div class="stk-grid">${all.map((p) => { const n = S.stickers[p.id] || 0;
+      return `<button class="stk ${n ? '' : 'none'}" data-id="${p.id}" aria-label="${n ? p.ko + ' 스티커 ' + n + '장' : '아직 못 모은 스티커'}"><img src="img/planet/${p.id}.webp" alt="" width="72" height="72"><span>${n ? p.ko : '?'}</span>${n > 1 ? `<small>×${n}</small>` : ''}</button>`; }).join('')}</div>
+    <div id="stkInfo" class="note">모은 스티커를 누르면 설명이 나와요.</div>
+    <div class="note"><b>스티커 받는 방법</b> (하루 ${STICKER_DAILY}장까지)<br>· 출석 도장 7일 연속<br>· 문제 10개 모두 맞히기<br>· 태양계 카드 순서 맞히기 한 번도 안 틀리기<br>· 연산 스피드 20개 이상 · 낱말 퍼즐 별 5개</div>
+    <button class="btn block" id="back">돌아가기</button></div>`;
+  $('#view').querySelectorAll('.stk').forEach((b) => b.onclick = () => {
+    const p = all.find((x) => x.id === b.dataset.id);
+    $('#stkInfo').innerHTML = S.stickers[p.id] ? `<b>${p.ko} (${p.en})</b> — ${esc(p.fact)}` : '아직 못 모은 스티커예요. 어떤 행성일까?';
+  });
+  $('#back').onclick = home;
+}
+
+// ───── 출석 도장 ─────
+// 오늘 처음 문제를 풀면 도장. 7일 연속마다 선물(도토리 배부름 +30, 우주 스티커 1장). 새로 찍었으면 true
+function markAttend(){
+  const a = S.attend, t = today();
+  if (a.last === t) return false;
+  a.streak = a.last && dayNum(t) - dayNum(a.last) === 1 ? a.streak + 1 : 1;
+  a.best = Math.max(a.best, a.streak); a.last = t;
+  a.days = a.days.concat(t).slice(-60);
+  let gift = '';
+  if (a.streak % 7 === 0) { S.pet.full = Math.min(100, S.pet.full + 30); gift = ' 선물로 도토리가 배부름 +30!'; grantSticker(); }
+  save(); sfx('win'); toast(`출석 도장 쾅! ${a.streak}일 연속이에요.${gift}`);
+  return true;
+}
 
 // ───── 헤더(통장) ─────
 function renderBook(){
@@ -386,12 +491,17 @@ function home(){
       <div class="row"><h2 style="font-size:24px">오늘은 뭘 풀어 볼까?</h2><span class="note" style="margin-left:auto">오늘 ${won(d.earned)} / ${won(s.dailyCap)}</span></div>
       <div class="subj">${subjHtml}</div>
     </div>
+    ${attendHtml()}
     <button class="btn coin block" id="goGame">게임 놀이터</button>
     <div class="grid2">
       <button class="btn" id="goWrong">오답노트 <span class="note">${S.wrong.length}</span></button>
       <button class="btn" id="goAI">AI 친구 척척이</button>
       <button class="btn" id="goLedger">내 통장 보기</button>
+      <button class="btn" id="goStk">우주 스티커 <span class="note">${window.GameData.PLANETS.filter((x) => S.stickers[x.id]).length}/9</span></button>
+    </div>
+    <div class="grid2">
       <button class="btn ghost" id="goParent">부모님 메뉴</button>
+      <button class="btn ghost" id="sndBtn" aria-pressed="${s.sound}">소리 ${s.sound ? '켜짐' : '꺼짐'}</button>
     </div>
     <p class="note center">푼 문제 ${S.stats.solved}개 · 정답률 ${S.stats.solved ? Math.round(S.stats.correct / S.stats.solved * 100) : 0}% · 최고 콤보 ${S.stats.bestCombo}</p>
     ${s.links.length ? `<div class="card" style="display:flex;flex-direction:column;gap:8px">
@@ -408,7 +518,20 @@ function home(){
   $('#view').querySelectorAll('[data-subj]').forEach((b) => b.onclick = () => setup(b.dataset.subj));
   $('#goWrong').onclick = () => S.wrong.length ? startReview() : toast('틀린 문제가 없어요. 멋져요!');
   $('#goAI').onclick = () => aiChat(); $('#goLedger').onclick = ledger; $('#goParent').onclick = parentGate; $('#goPet').onclick = () => petView(); $('#goGame').onclick = gamesView;
+  $('#goStk').onclick = stickerView;
+  $('#sndBtn').onclick = () => { s.sound = !s.sound; save(); const b = $('#sndBtn'); b.textContent = '소리 ' + (s.sound ? '켜짐' : '꺼짐'); b.setAttribute('aria-pressed', s.sound); sfx('ok'); };
   if (reached) $('#goCert').onclick = cert;
+}
+// 홈의 출석 도장 줄: 최근 7일
+function attendHtml(){
+  const a = S.attend, WD = ['일','월','화','수','목','금','토'], t = dayNum(today());
+  const cells = [6, 5, 4, 3, 2, 1, 0].map((k) => {
+    const dt = new Date(Date.now() - k * 86400000), key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+    const on = a.days.includes(key);
+    return `<span class="stamp ${on ? 'on' : ''} ${k === 0 ? 'today' : ''}" aria-label="${WD[dt.getDay()]}요일 ${on ? '출석' : '아직'}"><b>${on ? '★' : ''}</b><small>${k === 0 ? '오늘' : WD[dt.getDay()]}</small></span>`;
+  }).join('');
+  const alive = a.last && t - dayNum(a.last) <= 1 ? a.streak : 0;
+  return `<div class="card attend"><div class="row"><span class="eyebrow">출석 도장</span><span class="note" style="margin-left:auto">${alive ? `${alive}일 연속 · 선물까지 ${7 - (alive % 7)}일` : '오늘 한 문제 풀면 도장 쾅!'}</span></div><div class="stamps">${cells}</div></div>`;
 }
 
 // ───── 단원·난이도 고르기 ─────
@@ -501,7 +624,15 @@ function answer(val){
     if (!S.wrong.some((w) => w.key === q.key)) { const copy = Object.assign({}, q); S.wrong.push(copy); if (S.wrong.length > 60) S.wrong.shift(); }
     gain = -loss;
   }
+  // 부모님 리포트용 기록 (과목·단원별 푼 수와 맞힌 수)
+  const sub = R.subj !== 'review' ? R.subj : (q.subject || 'math');
+  const day = S.report[today()] = S.report[today()] || {};
+  day[sub] = day[sub] || [0, 0]; day[sub][0]++; if (correct) day[sub][1]++;
+  const uk = sub + '|' + String(q.unit || '').replace(' (복습)', '');
+  S.units[uk] = S.units[uk] || [0, 0]; S.units[uk][0]++; if (correct) S.units[uk][1]++;
   save(); renderBook();
+  sfx(correct ? 'ok' : 'no'); if (petMsg.includes('자랐어요') || petMsg.includes('되었어요')) sfx('win');
+  markAttend();
   // 표시
   if (q.type === 'mc') $('#answerArea').querySelectorAll('.choice').forEach((b) => { b.disabled = true; const i = +b.dataset.i; if (i === q.answer) b.classList.add('ok'); else if (i === val) b.classList.add('no'); });
   else { const box = $('#ansbox'); box.style.borderColor = correct ? 'var(--ok)' : 'var(--bad)'; }
@@ -546,12 +677,16 @@ function finishRound(){
   const n = Math.min(R.list.length, R.done && R.i < R.list.length ? R.i + 1 : R.i);
   if (n > 0 || R.earned !== 0) { addLedger(`${R.name} ${n}문제 중 ${R.correct}개 정답`, R.earned); save(); }
   const s = S.settings; const reached = S.balance >= s.goal; const r = R;
+  const perfect = !R.review && n === R.list.length && n >= 10 && R.correct === n;
+  const stk = perfect ? grantSticker() : null;
+  if (perfect) sfx('win');
   R = null; renderBook();
   $('#view').innerHTML = `
     <div class="card center" style="display:flex;flex-direction:column;gap:10px;align-items:center">
       <div class="eyebrow">${esc(r.name)} 결과</div>
       <div class="big-num num">${r.correct} / ${n}</div>
       <div class="disp" style="font-size:24px">${r.earned >= 0 ? '+' : ''}${won(r.earned)} 적립</div>
+      ${perfect ? `<p style="margin:0"><b>${stk ? `10문제 모두 정답! 우주 스티커 ${josa(stk.ko, '을', '를')} 받았어요` : '10문제 모두 정답! (오늘 스티커는 다 받았어요)'}</b></p>` : ''}
       <p class="note">${n === 0 ? '다음에 또 도전해요!' : r.correct === n ? '모두 맞혔어요! 최고예요!' : r.correct / n >= 0.7 ? '잘했어요! 틀린 문제는 오답노트에 있어요.' : '괜찮아요. 오답노트로 한 번 더 풀어 봐요.'}</p>
       ${reached ? `<button class="btn coin block" id="goCert">목표 달성! 칭찬 카드 만들기</button>` : `<p class="note">목표까지 ${won(s.goal - S.balance)} 남았어요</p>`}
       <button class="btn primary block" id="again">처음으로</button>
@@ -683,7 +818,7 @@ function petView(say, hop){
 // 지식 게임(태양계·연산·낱말)은 기록에 따라 10~30원, 게임마다 하루 GAME_PLAYS판까지만 적립. 도토리 받기는 적립 없음
 const GD = window.GameData;
 const GAME_PLAYS = 3;
-const PLANET_IMG = false; // img/planet/{id}.webp 그림을 넣으면 true로 바꾼다
+const PLANET_IMG = true; // false면 games-data.js의 간단한 SVG 행성을 쓴다
 const GAMES = [
   { id:'planet', name:'태양계 카드', desc:'행성 짝 맞추고, 태양에서 가까운 순서 맞히기', paid:true },
   { id:'speed',  name:'60초 연산 스피드', desc:'60초 동안 몇 문제나 맞힐까?', icon:'img/subj/math.webp', paid:true },
@@ -700,7 +835,7 @@ function gamesView(){
   renderBook();
   $('#view').innerHTML = `<div class="card" style="display:flex;flex-direction:column;gap:10px">
     <h2 style="font-size:24px">게임 놀이터</h2>
-    <p class="note">지식 게임은 잘하면 10~30원이 쌓여요. 게임마다 하루 ${GAME_PLAYS}판까지 적립돼요.</p>
+    <p class="note">지식 게임은 잘하면 10~30원이 쌓여요. 게임마다 하루 ${GAME_PLAYS}판까지 적립돼요.${S.settings.gameCap ? ` 오늘 한 게임 <b>${daily().plays || 0} / ${S.settings.gameCap}판</b>` : ''}</p>
     ${GAMES.map((g) => `<button class="gcard" data-game="${g.id}">${g.icon ? `<img src="${g.icon}" alt="" width="52" height="52">` : planetImg('saturn')}
       <span style="flex:1;min-width:0"><span class="disp">${g.name}</span><small>${g.desc}</small>
       <small>${g.paid ? `오늘 적립 ${gamesLeft(g.id)}판 남음` : '적립 없음'}${S.games.best[g.id] != null ? ` · 최고 ${{ planet:(b) => b + '번 만에 성공', speed:(b) => b + '개', word:(b) => '별 ' + b + '개', catch:(b) => b + '점' }[g.id](S.games.best[g.id])}` : ''}</small></span></button>`).join('')}
@@ -709,9 +844,16 @@ function gamesView(){
   $('#back').onclick = home;
 }
 // 게임 한 판이 끝났을 때: 적립(하루 판수·하루 한도 안에서), 거래내역, 결과 화면
-function gameEnd({ id, title, lines, amt = 0, label, again }){
+// 게임 시작할 때: 하루 게임 판수 제한(부모 설정 gameCap, 0이면 무제한)
+function gameStart(){
+  const cap = S.settings.gameCap, d = daily(); d.plays = d.plays || 0;
+  if (cap && d.plays >= cap) { toast(`오늘 게임은 ${cap}판 다 했어요. 내일 또 놀아요!`); gamesView(); return false; }
+  d.plays++; save(); return true;
+}
+function gameEnd({ id, title, lines, amt = 0, label, again, sticker = false }){
   const g = GAMES.find((x) => x.id === id), s = S.settings, d = daily(); d.games = d.games || {};
   let msg = '';
+  if (sticker) { const p = grantSticker(); lines = lines.concat(p ? `우주 스티커 ${josa(p.ko, '을', '를')} 받았어요!` : '멋진 기록! (오늘 스티커는 다 받았어요)'); }
   if (g.paid) {
     if (gamesLeft(id) === 0) { msg = `오늘 ${g.name} 적립은 다 했어요. 기록 도전은 계속할 수 있어요!`; amt = 0; }
     else {
@@ -747,6 +889,7 @@ function planetGame(){
   $('#back').onclick = gamesView;
 }
 function planetPlay(lv){
+  if (!gameStart()) return;
   const pairs = lv === 1 ? 4 : 6, en = lv === 3;
   const picked = shuffle(GD.PLANETS.slice(1)).slice(0, pairs);
   const cards = shuffle(picked.flatMap((p) => [{ id:p.id, face:'img' }, { id:p.id, face:'name' }]));
@@ -760,13 +903,13 @@ function planetPlay(lv){
   $('#mem').onclick = (e) => {
     const b = e.target.closest('.mcard'); if (!b || lock) return; const i = +b.dataset.i;
     if (b.classList.contains('open') || b.classList.contains('done')) return;
-    b.classList.add('open'); b.innerHTML = face(cards[i]); open.push(i);
+    b.classList.add('open'); b.innerHTML = face(cards[i]); open.push(i); sfx('tap');
     if (open.length < 2) return;
     moves++; $('#mv').textContent = moves + '번 뒤집음';
     const [a, c] = open; open = [];
     const ea = $(`.mcard[data-i="${a}"]`), ec = $(`.mcard[data-i="${c}"]`);
     if (cards[a].id === cards[c].id && cards[a].face !== cards[c].face) {
-      ea.classList.add('done'); ec.classList.add('done'); done++;
+      ea.classList.add('done'); ec.classList.add('done'); done++; sfx('ok');
       const p = GD.PLANETS.find((x) => x.id === cards[a].id); toast(`${p.ko}(${p.en}): ${p.fact}`);
       if (done === pairs) setTimeout(() => planetOrder(lv, moves), 900);
     } else {
@@ -783,18 +926,19 @@ function planetOrder(lv, moves){
     <div class="orbit" id="orbit">${order.map((p) => `<button class="obtn" data-id="${p.id}">${planetImg(p.id)}<span>${lv === 3 ? p.en : p.ko}</span></button>`).join('')}</div></div>`;
   $('#orbit').onclick = (e) => {
     const b = e.target.closest('.obtn'); if (!b || b.classList.contains('done')) return;
-    if (b.dataset.id === list[next].id) { b.classList.add('done'); b.insertAdjacentHTML('beforeend', `<span class="no">${next + 1}</span>`); next++; }
-    else { miss++; $('#om').textContent = '틀린 횟수 ' + miss; b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake'); toast(`${next + 1}번째로 가까운 행성은 뭘까?`); }
+    if (b.dataset.id === list[next].id) { b.classList.add('done'); b.insertAdjacentHTML('beforeend', `<span class="no">${next + 1}</span>`); next++; sfx('tap'); }
+    else { miss++; sfx('no'); $('#om').textContent = '틀린 횟수 ' + miss; b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake'); toast(`${next + 1}번째로 가까운 행성은 뭘까?`); }
     if (next === list.length) {
       const pairs = lv === 1 ? 4 : 6, amt = (moves <= pairs * 2 ? 20 : 10) + (miss === 0 ? 10 : 0);
       setBest('planet', moves, true);
-      setTimeout(() => gameEnd({ id:'planet', title:`${moves}번 만에 성공!`, lines:[`짝 맞추기 ${pairs}쌍 · 순서 맞히기 ${miss === 0 ? '한 번도 안 틀렸어요!' : miss + '번 틀림'}`, '수성 · 금성 · 지구 · 화성 · 목성 · 토성 · 천왕성 · 해왕성'], amt, label:`태양계 카드 ${pairs}쌍`, again:() => planetPlay(lv) }), 600);
+      setTimeout(() => gameEnd({ id:'planet', title:`${moves}번 만에 성공!`, lines:[`짝 맞추기 ${pairs}쌍 · 순서 맞히기 ${miss === 0 ? '한 번도 안 틀렸어요!' : miss + '번 틀림'}`, '수성 · 금성 · 지구 · 화성 · 목성 · 토성 · 천왕성 · 해왕성'], amt, label:`태양계 카드 ${pairs}쌍`, again:() => planetPlay(lv), sticker:miss === 0 }), 600);
     }
   };
 }
 
 // 2) 60초 연산 스피드
 function speedGame(){
+  if (!gameStart()) return;
   const grade = S.settings.grade; let score = 0, wrong = 0, q = null, left = 60, busy = false;
   $('#view').innerHTML = `<div class="card" style="display:flex;flex-direction:column;gap:10px">
     <div class="ghud"><span id="spdS">0개</span><span class="note" style="margin-left:auto"><span id="spdT">60</span>초</span></div>
@@ -808,11 +952,11 @@ function speedGame(){
     if (!$('#spdQ')) return clearInterval(tm); // 다른 화면으로 나감
     left--; $('#spdT').textContent = left; $('#spdBar').style.width = (left / 60 * 100) + '%';
     if (left <= 0) { clearInterval(tm); const amt = score >= 20 ? 30 : score >= 12 ? 20 : score >= 5 ? 10 : 0; const nb = setBest('speed', score);
-      gameEnd({ id:'speed', title:`${score}개 맞힘`, lines:[`틀린 문제 ${wrong}개`, nb ? '새 최고 기록이에요!' : `최고 기록 ${S.games.best.speed}개`, '5개 10원 · 12개 20원 · 20개 30원'], amt, label:`연산 스피드 ${score}개`, again:speedGame }); }
+      gameEnd({ id:'speed', title:`${score}개 맞힘`, lines:[`틀린 문제 ${wrong}개`, nb ? '새 최고 기록이에요!' : `최고 기록 ${S.games.best.speed}개`, '5개 10원 · 12개 20원 · 20개 30원'], amt, label:`연산 스피드 ${score}개`, again:speedGame, sticker:score >= 20 }); }
   }, 1000);
   $('#spdC').onclick = (e) => {
     const b = e.target.closest('button'); if (!b || busy) return; busy = true;
-    const ok = +b.dataset.i === q.answer; ok ? score++ : wrong++; $('#spdS').textContent = score + '개';
+    const ok = +b.dataset.i === q.answer; ok ? score++ : wrong++; $('#spdS').textContent = score + '개'; sfx(ok ? 'tap' : 'no');
     b.classList.add(ok ? 'flash-ok' : 'flash-no'); setTimeout(() => { busy = false; if ($('#spdQ') && left > 0) nextQ(); }, ok ? 180 : 450);
   };
   $('#quitG').onclick = () => { clearInterval(tm); gamesView(); };
@@ -820,6 +964,7 @@ function speedGame(){
 
 // 3) 낱말 퍼즐: 5문제, 한 문제에 1번 이하로 틀리면 별
 function wordGame(){
+  if (!gameStart()) return;
   const space = shuffle(GD.WORDS.filter((w) => w.cat === '우주'))[0];
   const list = [space, ...shuffle(GD.WORDS.filter((w) => w !== space)).slice(0, 4)];
   let idx = 0, stars = 0;
@@ -837,27 +982,28 @@ function wordGame(){
     $('#tiles').onclick = (e) => {
       const b = e.target.closest('button'); if (!b || b.disabled || pos >= chars.length) return;
       if (b.textContent === chars[pos]) {
-        b.disabled = true; b.classList.remove('hint'); const s = $('#slots').children[pos]; s.textContent = chars[pos]; s.classList.add('fill'); pos++;
+        b.disabled = true; b.classList.remove('hint'); const s = $('#slots').children[pos]; s.textContent = chars[pos]; s.classList.add('fill'); pos++; sfx('tap');
         if (pos === chars.length) {
-          if (miss <= 1) stars++;
+          if (miss <= 1) stars++; sfx('ok');
           $('#wmsg').innerHTML = `<div class="feedback ok"><span class="disp">${esc(it.w)}${miss <= 1 ? ' ★' : ''}</span>${it.cat === '맞춤법' ? `<span>${esc(josa(it.w, '이라고', '라고'))} 써요. 헷갈리는 글자에 속지 않았어요!</span>` : ''}</div>`;
           setTimeout(() => { idx++; idx < list.length ? play() : finish(); }, it.cat === '맞춤법' ? 1600 : 900);
         }
       } else {
-        miss++; b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake');
+        miss++; sfx('no'); b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake');
         if (miss >= 3) { const h = [...$('#tiles').children].find((x) => !x.disabled && x.textContent === chars[pos]); if (h) h.classList.add('hint'); }
       }
     };
   };
   const finish = () => {
     const amt = stars >= 5 ? 30 : stars >= 3 ? 20 : stars >= 1 ? 10 : 0; setBest('word', stars);
-    gameEnd({ id:'word', title:`별 ${stars}개`, lines:[`오늘 만난 낱말: ${list.map((x) => x.w).join(', ')}`, '별 1개 10원 · 3개 20원 · 5개 30원'], amt, label:`낱말 퍼즐 별 ${stars}개`, again:wordGame });
+    gameEnd({ id:'word', title:`별 ${stars}개`, lines:[`오늘 만난 낱말: ${list.map((x) => x.w).join(', ')}`, '별 1개 10원 · 3개 20원 · 5개 30원'], amt, label:`낱말 퍼즐 별 ${stars}개`, again:wordGame, sticker:stars >= 5 });
   };
   play();
 }
 
 // 4) 도토리 받기 (재미용, 적립 없음): 30초, 하트 3개. 도토리 +1, 호두 +3, 돌멩이는 하트 -1
 function catchGame(){
+  if (!gameStart()) return;
   $('#view').innerHTML = `<div class="card" style="display:flex;flex-direction:column;gap:10px">
     <div class="ghud"><span id="cS">0점</span><span id="cH" aria-label="남은 하트">♥♥♥</span><span class="note" style="margin-left:auto"><span id="cT">30</span>초</span></div>
     <div class="catchbox"><canvas id="cv" width="360" height="440" aria-label="도토리 받기 게임. 화면을 좌우로 움직여 다람쥐를 옮겨요"></canvas></div>
@@ -885,7 +1031,7 @@ function catchGame(){
       else x.drawImage(img[it.k], it.x - 18, it.y - 18, 36, 36);
       if (!it.hit && it.y > H - 80 && it.y < H - 20 && Math.abs(it.x - P.x) < P.w / 2) {
         it.hit = true;
-        if (it.k === 'rock') { hearts--; $('#cH').textContent = '♥'.repeat(hearts) + '♡'.repeat(3 - hearts); } else score += it.k === 'walnut' ? 3 : 1;
+        if (it.k === 'rock') { hearts--; sfx('no'); $('#cH').textContent = '♥'.repeat(hearts) + '♡'.repeat(3 - hearts); } else { score += it.k === 'walnut' ? 3 : 1; sfx('tap'); }
         $('#cS').textContent = score + '점';
       }
     }
@@ -1005,10 +1151,108 @@ function parentGate(){
     if (pin.length === 4) { if (pin === S.settings.pin) parent(); else { toast('비밀번호가 달라요'); pin = ''; $('#pinshow').textContent = '○○○○'; } }
   };
 }
+// ───── 학습 리포트 (최근 7일) ─────
+const dateKey = (dt) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+function reportData(){
+  const keys = [6, 5, 4, 3, 2, 1, 0].map((k) => dateKey(new Date(Date.now() - k * 86400000)));
+  const bySub = {}; let solved = 0, correct = 0;
+  for (const k of keys) for (const [sub, [n, c]] of Object.entries(S.report[k] || {})) { bySub[sub] = bySub[sub] || [0, 0]; bySub[sub][0] += n; bySub[sub][1] += c; solved += n; correct += c; }
+  const from = new Date(keys[0]).getTime() - 9 * 3600000; // 7일 전 0시(한국 시간) 근처부터
+  let earned = 0, bonus = 0;
+  for (const e of S.ledger) { if (e.t < from || !e.in) continue; if (e.memo.startsWith('칭찬 보너스')) bonus += e.in; else earned += e.in; }
+  const attend = keys.filter((k) => S.attend.days.includes(k)).length;
+  const subName = (id) => (SUBJECTS.find((x) => x.id === id) || { name:id }).name;
+  const weak = Object.entries(S.units).filter(([, [n]]) => n >= 5).map(([k, [n, c]]) => ({ sub:subName(k.split('|')[0]), unit:k.split('|')[1], n, rate:c / n }))
+    .filter((u) => u.rate < 0.8).sort((a, b) => a.rate - b.rate).slice(0, 3);
+  return { keys, solved, correct, earned, bonus, attend, weak, subs:Object.entries(bySub).map(([id, [n, c]]) => ({ name:subName(id), n, rate:n ? c / n : 0 })).sort((a, b) => b.n - a.n) };
+}
+const pct = (r) => Math.round(r * 100) + '%';
+function reportHtml(){
+  const r = reportData();
+  return `<div class="card" style="display:flex;flex-direction:column;gap:10px">
+    <h2 style="font-size:24px">이번 주 학습 리포트</h2>
+    <p class="note">최근 7일 (${r.keys[0].slice(5).replace('-', '.')} ~ ${r.keys[6].slice(5).replace('-', '.')})</p>
+    <div class="grid2">
+      <div><div class="note">푼 문제</div><div class="big-num" style="font-size:30px">${r.solved}개</div></div>
+      <div><div class="note">정답률</div><div class="big-num" style="font-size:30px">${r.solved ? pct(r.correct / r.solved) : '-'}</div></div>
+      <div><div class="note">출석</div><div class="big-num" style="font-size:30px">${r.attend}일</div></div>
+      <div><div class="note">스스로 모은 돈</div><div class="big-num" style="font-size:30px">${won(r.earned)}</div></div>
+    </div>
+    ${r.subs.length ? r.subs.map((x) => `<div class="rbar"><span>${esc(x.name)}</span><div class="bar"><i style="width:${Math.round(x.rate * 100)}%;background:${x.rate < 0.6 ? 'var(--bad)' : x.rate < 0.8 ? 'var(--coin)' : 'var(--ok)'}"></i></div><span class="note num">${x.n}문제 ${pct(x.rate)}</span></div>`).join('') : '<p class="note">이번 주에 푼 문제가 아직 없어요.</p>'}
+    <div><b>조금 더 연습하면 좋은 단원</b>${r.weak.length ? `<ul style="margin:4px 0;padding-left:20px">${r.weak.map((u) => `<li>${esc(u.sub)} · ${esc(u.unit)} <span class="note">(${u.n}문제 중 ${pct(u.rate)} 정답)</span></li>`).join('')}</ul>` : '<p class="note" style="margin:4px 0">정답률 80% 아래인 단원이 없어요. (5문제 이상 푼 단원 기준)</p>'}</div>
+    ${r.bonus ? `<p class="note">칭찬 보너스 ${won(r.bonus)}은 모은 돈에서 따로 셌어요.</p>` : ''}
+    <button class="btn block" id="repImg">리포트 이미지로 받기</button>
+  </div>`;
+}
+async function drawReport(){
+  try { await document.fonts.load('40px Jua'); await document.fonts.load('20px "Gowun Dodum"'); } catch(e) {}
+  const r = reportData(), s = S.settings, W = 1080, H = 1350, c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d');
+  x.fillStyle = '#e7f3ee'; x.fillRect(0, 0, W, H);
+  x.fillStyle = '#1f6f5c'; roundRect(x, 60, 60, W - 120, 200, 40); x.fill();
+  x.fillStyle = '#fff'; x.textAlign = 'center'; x.font = '60px Jua, sans-serif'; x.fillText(`${s.name}의 이번 주 공부`, W / 2, 160);
+  x.font = '34px "Gowun Dodum", sans-serif'; x.fillText(`${r.keys[0]} ~ ${r.keys[6]}`, W / 2, 222);
+  const stats = [['푼 문제', r.solved + '개'], ['정답률', r.solved ? pct(r.correct / r.solved) : '-'], ['출석', r.attend + '일'], ['모은 돈', won(r.earned)]];
+  stats.forEach(([k, v], i) => { const bx = 60 + (i % 2) * 490, by = 300 + Math.floor(i / 2) * 200; x.fillStyle = '#fff'; roundRect(x, bx, by, 470, 180, 28); x.fill();
+    x.fillStyle = '#5b7870'; x.font = '34px "Gowun Dodum", sans-serif'; x.fillText(k, bx + 235, by + 62); x.fillStyle = '#1f6f5c'; x.font = '72px Jua, sans-serif'; x.fillText(v, bx + 235, by + 145); });
+  x.fillStyle = '#fff'; roundRect(x, 60, 720, W - 120, 560, 28); x.fill();
+  x.textAlign = 'left'; x.fillStyle = '#18352f'; x.font = '42px Jua, sans-serif'; x.fillText('과목별 정답률', 110, 790);
+  r.subs.slice(0, 4).forEach((u, i) => { const y = 850 + i * 70; x.font = '34px "Gowun Dodum", sans-serif'; x.fillStyle = '#18352f'; x.fillText(u.name, 110, y + 12);
+    x.fillStyle = '#cfe3db'; roundRect(x, 330, y - 14, 440, 30, 15); x.fill(); x.fillStyle = u.rate < 0.6 ? '#d9534a' : u.rate < 0.8 ? '#f2b632' : '#2a9d63'; roundRect(x, 330, y - 14, Math.max(30, 440 * u.rate), 30, 15); x.fill();
+    x.fillStyle = '#5b7870'; x.fillText(`${u.n}문제 ${pct(u.rate)}`, 800, y + 12); });
+  x.fillStyle = '#18352f'; x.font = '42px Jua, sans-serif'; x.fillText('연습하면 좋은 단원', 110, 1150);
+  x.font = '32px "Gowun Dodum", sans-serif'; x.fillStyle = '#5b7870';
+  x.fillText(r.weak.length ? r.weak.map((u) => `${u.sub} ${u.unit}`).join(' · ').slice(0, 40) : '모든 단원을 잘하고 있어요!', 110, 1210);
+  return c;
+}
+async function reportImage(){
+  const c = await drawReport(); const url = c.toDataURL('image/png');
+  $('#view').innerHTML = `<div class="card" style="display:flex;flex-direction:column;gap:12px">
+    <img class="cert-img" src="${url}" alt="이번 주 학습 리포트">
+    <button class="btn coin block" id="share">카톡·문자로 보내기</button>
+    <p class="note center" id="shareNote">버튼이 안 되면 이미지를 길게 눌러 저장해요.</p>
+    <button class="btn block" id="back">부모님 메뉴로</button></div>`;
+  $('#back').onclick = parent;
+  $('#share').onclick = async () => {
+    try { const blob = await new Promise((r) => c.toBlob(r, 'image/png')); const file = new File([blob], 'chukchuk-report.png', { type:'image/png' });
+      if (navigator.canShare && navigator.canShare({ files:[file] })) { await navigator.share({ files:[file], title:'척척 용돈통장 주간 리포트' }); return; } throw new Error('no share');
+    } catch (e) { if (e && e.name === 'AbortError') return; $('#shareNote').innerHTML = '<b>이미지를 길게 눌러 저장해 주세요.</b>'; }
+  };
+}
+
+// ───── 백업 ─────
+// 파일 형식: { app:'chukchuk-bank', v:1, savedAt, data:S }
+async function backupSave(){
+  const t = today(); S.lastBackup = t; save();
+  const text = JSON.stringify({ app:'chukchuk-bank', v:1, savedAt:new Date().toISOString(), data:S });
+  const name = `chukchuk-backup-${t}.json`;
+  try {
+    const file = new File([text], name, { type:'application/json' });
+    if (navigator.canShare && navigator.canShare({ files:[file] })) { await navigator.share({ files:[file], title:'척척 용돈통장 백업' }); toast('백업 파일을 보냈어요'); return parent(); }
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type:'application/json' })); a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  toast('백업 파일을 저장했어요'); parent();
+}
+function backupLoad(file){
+  const rd = new FileReader();
+  rd.onload = () => {
+    let obj = null; try { obj = JSON.parse(rd.result); } catch (e) {}
+    const d = obj && obj.data;
+    if (!obj || obj.app !== 'chukchuk-bank' || !d || typeof d.balance !== 'number' || !Array.isArray(d.ledger)) return toast('척척 용돈통장 백업 파일이 아니에요');
+    $('#restoreArea').innerHTML = `<p><b>${esc(String(obj.savedAt).slice(0, 10))}</b>에 만든 백업이에요. 잔액 <b>${won(d.balance)}</b>, 거래 ${d.ledger.length}건.<br>지금 이 폰의 기록은 <b>백업 내용으로 바뀌어요.</b></p>
+      <div class="row"><button class="btn danger" id="restoreYes">되돌리기</button><button class="btn" id="restoreNo">취소</button></div>`;
+    $('#restoreNo').onclick = parent;
+    $('#restoreYes').onclick = () => { try { localStorage.setItem(KEY, JSON.stringify(d)); } catch (e) { return toast('저장에 실패했어요'); } load(); save(); renderBook(); toast('백업으로 되돌렸어요'); parent(); };
+  };
+  rd.readAsText(file);
+}
+
 function parent(){
   const s = S.settings;
   const f = (id, label, val, type = 'number', extra = '') => `<div class="field"><label for="${id}">${label}</label><input id="${id}" type="${type}" value="${esc(val)}" ${extra}></div>`;
+  const lb = S.lastBackup ? dayNum(today()) - dayNum(S.lastBackup) : null;
   $('#view').innerHTML = `
+    ${reportHtml()}
     <div class="card" style="display:flex;flex-direction:column;gap:12px">
       <h2 style="font-size:24px">용돈 지급</h2>
       <p>현재 잔액 <b class="num">${won(S.balance)}</b> · 오늘 칭찬카드 확인코드 <b>${code()}</b></p>
@@ -1033,6 +1277,7 @@ function parent(){
       <div class="grid2">${f('r1', '쉬움 정답(원)', s.reward[1])}${f('r2', '보통 정답(원)', s.reward[2])}${f('r3', '어려움 정답(원)', s.reward[3])}${f('sCombo', '5콤보 보너스(원)', s.comboBonus)}${f('sPen', '틀리면 빼기(원, 0=안 뺌)', s.penalty)}${f('sCap', '하루 적립 한도(원)', s.dailyCap)}</div>
       ${f('sGoal', '목표 금액(원) — 채우면 칭찬 카드', s.goal)}
       ${f('sPetCap', '펫 먹이·꾸미기에 하루 쓸 수 있는 돈(원)', s.petCap)}
+      ${f('sGameCap', '하루 게임 판수 (0이면 제한 없음)', s.gameCap)}
       ${f('sPin', '부모 비밀번호(숫자 4자리)', s.pin, 'text', 'inputmode="numeric" maxlength="4" pattern="[0-9]{4}"')}
       <hr><h3 style="font-size:20px">AI 친구 연결</h3>
       ${f('sAiUrl', 'AI 서버 주소 (Supabase 함수 URL)', s.aiUrl, 'url', 'placeholder="https://xxxx.supabase.co/functions/v1/kid-tutor"')}
@@ -1053,6 +1298,14 @@ function parent(){
       <button class="btn block" id="addLink">링크 넣기</button>
     </div>
     <div class="card" style="display:flex;flex-direction:column;gap:10px">
+      <h2 style="font-size:20px">백업</h2>
+      <p>${lb === null ? '<b style="color:var(--bad)">아직 백업한 적이 없어요.</b>' : lb === 0 ? '오늘 백업했어요.' : `마지막 백업: <b>${lb}일 전</b>${lb >= 14 ? ' <b style="color:var(--bad)">· 새로 백업해 주세요</b>' : ''}`}</p>
+      <p class="note">잔액·거래내역·펫·스티커가 모두 이 폰 안에만 있어요. 폰을 바꾸거나 인터넷 기록을 지우면 사라지니, 백업 파일을 카톡 '나와의 채팅' 등에 보관해 주세요. 파일에는 부모 비밀번호와 앱 토큰도 들어 있어요.</p>
+      <div class="grid2"><button class="btn primary" id="bkSave">백업 파일 만들기</button><button class="btn" id="bkLoad">백업 불러오기</button></div>
+      <input type="file" id="bkFile" accept="application/json,.json" hidden>
+      <div id="restoreArea"></div>
+    </div>
+    <div class="card" style="display:flex;flex-direction:column;gap:10px">
       <h2 style="font-size:20px">초기화</h2>
       <p class="note">잔액·거래내역·오답노트·펫을 모두 지웁니다. 설정은 남아요.</p>
       <div id="resetArea"><button class="btn danger" id="reset">모두 지우기</button></div>
@@ -1063,9 +1316,13 @@ function parent(){
   $('#bonus').onclick = () => { const a = n('bonusAmt'); if (!a) return toast('보너스 금액을 넣어 주세요'); const why = v('bonusWhy').trim(); S.balance += a; addLedger(why ? `칭찬 보너스: ${why}` : '칭찬 보너스', a); save(); renderBook(); toast(won(a) + ' 넣었어요'); parent(); };
   $('#saveS').onclick = () => {
     const pin = v('sPin'); if (!/^\d{4}$/.test(pin)) return toast('비밀번호는 숫자 4자리예요');
-    Object.assign(s, { name:v('sName').trim() || '우리 아이', grade:+v('sGrade'), sem:+v('sSem'), review:$('#sReview').checked, reward:{1:n('r1'),2:n('r2'),3:n('r3')}, comboBonus:n('sCombo'), penalty:n('sPen'), dailyCap:n('sCap'), goal:n('sGoal', 100), petCap:n('sPetCap'), pin, aiUrl:v('sAiUrl').trim(), aiToken:v('sAiTok').trim(), aiDaily:n('sAiDaily'), likes:v('sLikes').trim() });
+    Object.assign(s, { name:v('sName').trim() || '우리 아이', grade:+v('sGrade'), sem:+v('sSem'), review:$('#sReview').checked, reward:{1:n('r1'),2:n('r2'),3:n('r3')}, comboBonus:n('sCombo'), penalty:n('sPen'), dailyCap:n('sCap'), goal:n('sGoal', 100), petCap:n('sPetCap'), gameCap:n('sGameCap'), pin, aiUrl:v('sAiUrl').trim(), aiToken:v('sAiTok').trim(), aiDaily:n('sAiDaily'), likes:v('sLikes').trim() });
     save(); renderBook(); toast('저장했어요');
   };
+  $('#repImg').onclick = reportImage;
+  $('#bkSave').onclick = backupSave;
+  $('#bkLoad').onclick = () => $('#bkFile').click();
+  $('#bkFile').onchange = (e) => { const fl = e.target.files[0]; if (fl) backupLoad(fl); };
   $('#view').querySelectorAll('[data-dellink]').forEach((b) => b.onclick = () => { s.links.splice(+b.dataset.dellink, 1); save(); toast('링크를 뺐어요'); parent(); });
   $('#addLink').onclick = () => {
     const title = v('lTitle').trim(), url = v('lUrl').trim(), note = v('lNote').trim();
