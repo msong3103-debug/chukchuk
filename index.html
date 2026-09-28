@@ -97,6 +97,12 @@ h1,h2,h3,.disp{font-family:var(--display);font-weight:400;margin:0;text-wrap:bal
 .item img{width:52px;height:52px}
 .item small{color:var(--muted);font-size:13px}
 .item[aria-pressed="true"]{border:2px solid var(--brand)}
+.wonder{display:flex;flex-direction:column;gap:10px;border-left:8px solid var(--coin)}
+.wonder .disp{font-size:22px;line-height:1.4;word-break:keep-all;margin:0}
+.linkrow{display:flex;flex-direction:column;justify-content:center;min-height:56px;padding:10px 14px;border-radius:14px;border:1px solid var(--line);background:var(--panel2);color:var(--ink);text-decoration:none;box-shadow:var(--shadow)}
+.linkrow .disp{font-size:18px;color:var(--brand)}
+.linkrow small{color:var(--muted);font-size:14px}
+.linkrow:focus-visible{outline:3px solid var(--coin);outline-offset:2px}
 .fb-pet{float:right;width:76px;height:76px;margin:-6px -6px 0 6px}
 @keyframes hop{0%,100%{transform:translate(-50%,0)}40%{transform:translate(-50%,-14px)}}
 .room .pet.hop{animation:hop .5s ease-out 2}
@@ -217,7 +223,34 @@ const SUBJECTS = [
 
 // ───── 저장 ─────
 const KEY = 'chukchuk-bank-v1';
-const DEF_SETTINGS = { name:'우리 딸', grade:2, sem:2, review:true, reward:{1:10,2:30,3:50}, comboBonus:50, penalty:0, dailyCap:1000, goal:5000, pin:'0000', aiUrl:'', aiToken:'', aiDaily:20, petCap:200 };
+// 부모님이 고른 추천 링크 (부모님 메뉴에서 바꿀 수 있음)
+const DEF_LINKS = [
+  { title:'NASA Space Place', url:'https://spaceplace.nasa.gov', note:'행성과 우주 이야기 (영어)' },
+  { title:'국립과천과학관', url:'https://www.sciencecenter.go.kr', note:'천체투영관과 우주 전시' },
+  { title:'EBS 초등', url:'https://primary.ebs.co.kr', note:'학년별 강좌와 창의체험' },
+  { title:'사이언스올', url:'https://www.scienceall.com', note:'과학 영상과 과학 만화' },
+  { title:'국립어린이청소년도서관', url:'https://www.nlcy.go.kr', note:'사서 선생님 추천 책' },
+];
+// 첫 화면 '오늘의 궁금증' — 날마다 하나씩 바뀐다
+const WONDERS = [
+  '하늘은 왜 파란색일까?', '달은 왜 날마다 모양이 바뀌어 보일까?', '고양이는 왜 수염이 있을까?', '비는 어디에서 오는 걸까?',
+  '무지개는 왜 여러 가지 색일까?', '개미는 어떻게 집으로 가는 길을 찾을까?', '추운 날 입김은 왜 하얗게 보일까?', '가을이 되면 나뭇잎 색은 왜 바뀔까?',
+  '꿀벌은 꿀을 어떻게 만들까?', '아무도 공룡을 본 적이 없는데, 공룡이 있었다는 걸 어떻게 알까?', '바닷물은 왜 짤까?', '밤하늘의 별은 왜 반짝반짝 빛날까?',
+  '번개가 번쩍한 뒤에 천둥소리는 왜 늦게 들릴까?', '얼음은 왜 물에 동동 뜰까?', '풍선을 머리에 문지르면 왜 머리카락이 달라붙을까?', '거미는 왜 자기 거미줄에 안 붙을까?',
+  '코끼리는 긴 코로 어떤 일을 할까?', '딸꾹질은 왜 날까?', '다른 사람이 하품하면 왜 나도 하품이 날까?', '비 오는 날 지렁이는 왜 땅 위로 나올까?',
+  '소금을 물에 넣으면 어디로 사라질까?', '비행기는 그렇게 무거운데 어떻게 하늘을 날까?', '그림자는 왜 아침과 저녁에 더 길어질까?', '눈송이는 왜 모양이 다 다를까?',
+  '박쥐는 깜깜한 밤에 어떻게 부딪히지 않고 날까?', '다른 나라 친구들은 어떻게 인사할까?', '1부터 10까지 더하면 얼마일까? 빨리 더하는 방법이 있을까?', '종이를 반으로 몇 번까지 접을 수 있을까?',
+  '거울 속의 나는 왜 왼쪽과 오른쪽이 바뀌어 보일까?', '새는 전깃줄에 앉아도 왜 괜찮을까?', '우리는 왜 밤마다 잠을 자야 할까?', '물고기는 물속에서 어떻게 숨을 쉴까?',
+  '낮에는 왜 별이 안 보일까?', '씨앗 속에는 무엇이 들어 있을까?', '우리 동네 지도를 그린다면 꼭 넣어야 할 곳은 어디일까?', '옛날 사람들은 시계 없이 시간을 어떻게 알았을까?',
+];
+// 우주 궁금증 — 이틀에 한 번은 이쪽에서 나온다
+const SPACE_WONDERS = [
+  '태양계에서 가장 큰 행성은 어디일까? 영어로는 뭐라고 부를까?', '토성의 고리는 무엇으로 되어 있을까?', '화성은 왜 붉은색으로 보일까?', '우주에서는 왜 소리가 들리지 않을까?',
+  '우주비행사는 우주정거장에서 어떻게 잠을 잘까?', '달에 남긴 발자국은 왜 아주 오래 남아 있을까?', '지구는 빙글빙글 도는데 우리는 왜 어지럽지 않을까?', '별똥별은 사실 무엇일까?',
+  '목성에 있는 커다란 빨간 점은 무엇일까?', '밤하늘에서 행성과 별은 어떻게 구별할 수 있을까?', '블랙홀은 왜 까맣게 보일까?', '수성은 태양과 가장 가까운데, 왜 금성이 더 뜨거울까?',
+  '달은 왜 늘 같은 얼굴만 보여 줄까?', '해왕성(Neptune)은 왜 파랗게 보일까?', '우주에서 지구를 보면 어떤 모습일까?', '태양도 별이라는데, 왜 다른 별보다 훨씬 크고 밝아 보일까?',
+];
+const DEF_SETTINGS = { name:'우리 딸', grade:2, sem:2, review:true, reward:{1:10,2:30,3:50}, comboBonus:50, penalty:0, dailyCap:1000, goal:5000, pin:'0000', aiUrl:'', aiToken:'', aiDaily:20, petCap:200, links:DEF_LINKS, likes:'우주, 태양계 행성' };
 const DEF_PET = { exp:0, full:100, lastDay:'', owned:[], wear:[], dex:[] };
 let S;
 function load(){
@@ -226,6 +259,7 @@ function load(){
   S.settings = Object.assign({}, DEF_SETTINGS, S.settings || {});
   S.settings.reward = Object.assign({}, DEF_SETTINGS.reward, S.settings.reward || {});
   S.pet = Object.assign({}, DEF_PET, S.pet || {});
+  S.settings.links = (Array.isArray(S.settings.links) ? S.settings.links : DEF_LINKS).map((l) => Object.assign({}, l));
   if (!raw) S.ledger.push({ t:Date.now(), memo:'통장 만들기', in:0, out:0, bal:0 });
 }
 function save(){ try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e) {} }
@@ -311,10 +345,26 @@ function home(){
       <button class="btn" id="goLedger">내 통장 보기</button>
       <button class="btn ghost" id="goParent">부모님 메뉴</button>
     </div>
-    <p class="note center">푼 문제 ${S.stats.solved}개 · 정답률 ${S.stats.solved ? Math.round(S.stats.correct / S.stats.solved * 100) : 0}% · 최고 콤보 ${S.stats.bestCombo}</p>`;
+    <p class="note center">푼 문제 ${S.stats.solved}개 · 정답률 ${S.stats.solved ? Math.round(S.stats.correct / S.stats.solved * 100) : 0}% · 최고 콤보 ${S.stats.bestCombo}</p>
+    <div class="card wonder">
+      <div class="eyebrow">오늘의 궁금증</div>
+      <p class="disp" id="wonderQ" aria-live="polite"></p>
+      <div class="row">${s.aiUrl ? '<button class="btn primary" id="askWonder">척척이에게 물어보기</button>' : ''}<button class="btn ghost" id="nextWonder">다른 궁금증</button></div>
+    </div>
+    ${s.links.length ? `<div class="card" style="display:flex;flex-direction:column;gap:8px">
+      <div class="eyebrow">엄마·아빠가 골라 준 곳</div>
+      ${s.links.map((l) => `<a class="linkrow" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer"><span class="disp">${esc(l.title)}</span>${l.note ? `<small>${esc(l.note)}</small>` : ''}</a>`).join('')}
+    </div>` : ''}`;
+  // 날짜로 번갈아 고른다: 짝수 날은 우주, 홀수 날은 여러 주제. '다른 궁금증'도 번갈아 나온다
+  let wi = dayNum(today());
+  const wonderAt = (i) => (i % 2 === 0 ? SPACE_WONDERS[(i / 2) % SPACE_WONDERS.length] : WONDERS[((i - 1) / 2) % WONDERS.length]);
+  const showWonder = () => { $('#wonderQ').textContent = wonderAt(wi); };
+  showWonder();
+  $('#nextWonder').onclick = () => { wi++; showWonder(); };
+  if (s.aiUrl) $('#askWonder').onclick = () => aiChat(wonderAt(wi));
   $('#view').querySelectorAll('[data-subj]').forEach((b) => b.onclick = () => setup(b.dataset.subj));
   $('#goWrong').onclick = () => S.wrong.length ? startReview() : toast('틀린 문제가 없어요. 멋져요!');
-  $('#goAI').onclick = aiChat; $('#goLedger').onclick = ledger; $('#goParent').onclick = parentGate; $('#goPet').onclick = () => petView();
+  $('#goAI').onclick = () => aiChat(); $('#goLedger').onclick = ledger; $('#goParent').onclick = parentGate; $('#goPet').onclick = () => petView();
   if (reached) $('#goCert').onclick = cert;
 }
 
@@ -646,13 +696,13 @@ async function askAI(payload){
   const s = S.settings; if (!s.aiUrl) throw new Error('noai');
   const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 20000);
   try {
-    const r = await fetch(s.aiUrl, { method:'POST', headers:{ 'content-type':'application/json', 'x-app-token':s.aiToken }, body:JSON.stringify(Object.assign({ name:s.name }, payload)), signal:ctl.signal });
+    const r = await fetch(s.aiUrl, { method:'POST', headers:{ 'content-type':'application/json', 'x-app-token':s.aiToken }, body:JSON.stringify(Object.assign({ name:s.name, likes:s.likes }, payload)), signal:ctl.signal });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const j = await r.json(); if (!j.text) throw new Error('empty'); return j.text;
   } finally { clearTimeout(tm); }
 }
 let CHAT = [];
-function aiChat(){
+function aiChat(prefill){
   const s = S.settings, d = daily();
   const left = Math.max(0, s.aiDaily - d.ai);
   const intro = s.aiUrl ? `안녕, ${s.name}! 나는 AI 친구 척척이야. 공부하다 궁금한 걸 물어봐. 오늘은 ${left}번 물어볼 수 있어.` : 'AI 친구는 아직 준비 중이에요. 부모님 메뉴에서 연결하면 대화할 수 있어요.';
@@ -663,6 +713,7 @@ function aiChat(){
     <p class="note">척척이는 사람이 아니라 AI예요. 가끔 틀릴 수 있으니 중요한 건 엄마·아빠나 선생님께 꼭 여쭤봐요.</p>
     <button class="btn block" id="back">돌아가기</button></div>`;
   $('#back').onclick = home;
+  if (prefill && !$('#chatIn').disabled) { $('#chatIn').value = prefill; $('#chatIn').focus(); }
   $('#chatForm').onsubmit = async (e) => {
     e.preventDefault(); const inp = $('#chatIn'); const text = inp.value.trim(); if (!text) return;
     const dd = daily(); if (dd.ai >= s.aiDaily) return toast('오늘 질문은 다 썼어요. 내일 또 만나!');
@@ -718,8 +769,19 @@ function parent(){
       ${f('sAiUrl', 'AI 서버 주소 (Supabase 함수 URL)', s.aiUrl, 'url', 'placeholder="https://xxxx.supabase.co/functions/v1/kid-tutor"')}
       ${f('sAiTok', '앱 토큰 (APP_TOKEN과 같은 값)', s.aiToken, 'text')}
       ${f('sAiDaily', '하루 AI 질문 수', s.aiDaily)}
+      ${f('sLikes', '아이가 좋아하는 것 (척척이가 설명할 때 예시로 써요)', s.likes, 'text', 'maxlength="40" placeholder="예) 우주, 태양계 행성"')}
       <p class="note">Claude API 키는 여기에 넣지 않아요. 키는 서버(Supabase)에만 보관돼요.</p>
       <button class="btn primary block" id="saveS">설정 저장</button>
+    </div>
+    <div class="card" style="display:flex;flex-direction:column;gap:10px">
+      <h2 style="font-size:20px">추천 링크</h2>
+      <p class="note">첫 화면 아래에 보여요. 아이에게 보여 줘도 괜찮은 곳만 직접 확인하고 넣어 주세요.</p>
+      ${s.links.map((l, i) => `<div class="row"><span style="flex:1;min-width:0;word-break:break-all"><b>${esc(l.title)}</b><br><small class="note">${esc(l.url)}</small></span><button class="btn" data-dellink="${i}">빼기</button></div>`).join('') || '<p class="note">넣은 링크가 없어요.</p>'}
+      <hr>
+      ${f('lTitle', '이름', '', 'text', 'maxlength="20"')}
+      ${f('lUrl', '주소 (https://로 시작)', '', 'url', 'placeholder="https://"')}
+      ${f('lNote', '한 줄 설명 (선택)', '', 'text', 'maxlength="30"')}
+      <button class="btn block" id="addLink">링크 넣기</button>
     </div>
     <div class="card" style="display:flex;flex-direction:column;gap:10px">
       <h2 style="font-size:20px">초기화</h2>
@@ -732,8 +794,16 @@ function parent(){
   $('#bonus').onclick = () => { const a = n('payAmt'); if (!a) return toast('금액을 넣어 주세요'); S.balance += a; addLedger('칭찬 보너스', a); save(); toast(won(a) + ' 넣었어요'); parent(); };
   $('#saveS').onclick = () => {
     const pin = v('sPin'); if (!/^\d{4}$/.test(pin)) return toast('비밀번호는 숫자 4자리예요');
-    Object.assign(s, { name:v('sName').trim() || '우리 아이', grade:+v('sGrade'), sem:+v('sSem'), review:$('#sReview').checked, reward:{1:n('r1'),2:n('r2'),3:n('r3')}, comboBonus:n('sCombo'), penalty:n('sPen'), dailyCap:n('sCap'), goal:n('sGoal', 100), petCap:n('sPetCap'), pin, aiUrl:v('sAiUrl').trim(), aiToken:v('sAiTok').trim(), aiDaily:n('sAiDaily') });
+    Object.assign(s, { name:v('sName').trim() || '우리 아이', grade:+v('sGrade'), sem:+v('sSem'), review:$('#sReview').checked, reward:{1:n('r1'),2:n('r2'),3:n('r3')}, comboBonus:n('sCombo'), penalty:n('sPen'), dailyCap:n('sCap'), goal:n('sGoal', 100), petCap:n('sPetCap'), pin, aiUrl:v('sAiUrl').trim(), aiToken:v('sAiTok').trim(), aiDaily:n('sAiDaily'), likes:v('sLikes').trim() });
     save(); renderBook(); toast('저장했어요');
+  };
+  $('#view').querySelectorAll('[data-dellink]').forEach((b) => b.onclick = () => { s.links.splice(+b.dataset.dellink, 1); save(); toast('링크를 뺐어요'); parent(); });
+  $('#addLink').onclick = () => {
+    const title = v('lTitle').trim(), url = v('lUrl').trim(), note = v('lNote').trim();
+    if (!title) return toast('이름을 넣어 주세요');
+    let ok = false; try { ok = new URL(url).protocol === 'https:'; } catch(e) {}
+    if (!ok) return toast('주소는 https://로 시작해야 해요');
+    s.links.push({ title, url, note }); save(); toast('링크를 넣었어요'); parent();
   };
   $('#reset').onclick = () => {
     $('#resetArea').innerHTML = `<p><b>정말 지울까요?</b> 되돌릴 수 없어요.</p><div class="row"><button class="btn danger" id="resetYes">지우기</button><button class="btn" id="resetNo">취소</button></div>`;

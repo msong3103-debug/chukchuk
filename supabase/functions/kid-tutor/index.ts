@@ -61,6 +61,9 @@ Deno.serve(async (req) => {
   const grade = Math.min(6, Math.max(1, Number(body.grade) || 2));
   const name = String(body.name || "친구").slice(0, 10);
   let system = BASE(grade, name);
+  // 부모님이 적은 아이의 관심사 (한 줄, 40자까지)
+  const likes = String(body.likes || "").replace(/\s+/g, " ").trim().slice(0, 40);
+  if (likes) system += `\n\n아이가 좋아하는 것: ${likes}\n- 설명할 때 어울리면 가끔 이와 관련된 예시를 들어 줘. 억지로 끌어오지는 마.`;
   let messages: { role: "user" | "assistant"; content: string }[] = [];
 
   if (body.mode === "hint") {
