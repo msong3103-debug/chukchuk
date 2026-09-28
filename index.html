@@ -72,6 +72,35 @@ h1,h2,h3,.disp{font-family:var(--display);font-weight:400;margin:0;text-wrap:bal
 .sbtn .disp{font-size:22px;color:var(--c)}
 .sbtn small{color:var(--muted);font-size:13px;word-break:keep-all}
 .sbtn.locked{--c:var(--lock)!important;cursor:default;box-shadow:none;opacity:.8}
+.sbtn{padding-right:50px}
+.sicon{position:absolute;top:10px;right:10px;width:36px;height:36px}
+.sbtn.locked .sicon{filter:grayscale(1);opacity:.5}
+
+/* 펫 */
+.petcard{display:flex;align-items:center;gap:12px;width:100%;text-align:left;box-shadow:var(--shadow)}
+.petcard .disp{font-size:20px}
+.petcard .note{display:block}
+.pet{display:block;position:relative;flex:none;aspect-ratio:1}
+.pet > img{width:100%;height:100%;display:block}
+.pet .wear{position:absolute;height:auto;pointer-events:none}
+.gauge{display:block;height:10px;border-radius:99px;background:var(--line);overflow:hidden;margin-top:4px}
+.gauge i{display:block;height:100%;border-radius:99px;background:var(--ok);transition:width .4s}
+.gauge.low i{background:var(--bad)}
+.gauge.exp i{background:var(--coin)}
+.room{position:relative;border-radius:var(--radius);background:linear-gradient(to bottom,var(--panel2) 72%,var(--line) 72%);overflow:hidden;aspect-ratio:5/4}
+.room .house{position:absolute;left:3%;bottom:10%;width:30%}
+.room .blanket{position:absolute;left:50%;bottom:1%;width:72%;transform:translateX(-50%) scaleY(.55);transform-origin:bottom}
+.room .pet{position:absolute;left:50%;bottom:9%;width:56%;transform:translateX(-50%)}
+.bubble{background:var(--panel);border:2px solid var(--line);border-radius:16px;padding:8px 14px;font-family:var(--display);font-size:18px;text-align:center}
+.shop{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.item{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;min-height:48px;border-radius:14px;border:1px solid var(--line);background:var(--panel2);box-shadow:var(--shadow);font-size:15px;line-height:1.3}
+.item img{width:52px;height:52px}
+.item small{color:var(--muted);font-size:13px}
+.item[aria-pressed="true"]{border:2px solid var(--brand)}
+.fb-pet{float:right;width:76px;height:76px;margin:-6px -6px 0 6px}
+@keyframes hop{0%,100%{transform:translate(-50%,0)}40%{transform:translate(-50%,-14px)}}
+.room .pet.hop{animation:hop .5s ease-out 2}
+@media (prefers-reduced-motion:reduce){.room .pet.hop{animation:none}.gauge i{transition:none}}
 .cta-reward{display:flex;align-items:center;gap:12px;padding:16px;border-radius:var(--radius);background:var(--coin);color:var(--coin-ink);box-shadow:var(--shadow);text-align:left;width:100%}
 .cta-reward .disp{font-size:21px}
 
@@ -188,17 +217,19 @@ const SUBJECTS = [
 
 // ───── 저장 ─────
 const KEY = 'chukchuk-bank-v1';
-const DEF_SETTINGS = { name:'우리 딸', grade:2, sem:2, review:true, reward:{1:10,2:30,3:50}, comboBonus:50, penalty:0, dailyCap:1000, goal:5000, pin:'0000', aiUrl:'', aiToken:'', aiDaily:20 };
+const DEF_SETTINGS = { name:'우리 딸', grade:2, sem:2, review:true, reward:{1:10,2:30,3:50}, comboBonus:50, penalty:0, dailyCap:1000, goal:5000, pin:'0000', aiUrl:'', aiToken:'', aiDaily:20, petCap:200 };
+const DEF_PET = { exp:0, full:100, lastDay:'', owned:[], wear:[], dex:[] };
 let S;
 function load(){
   let raw = null; try { raw = JSON.parse(localStorage.getItem(KEY)); } catch(e) {}
   S = Object.assign({ balance:0, ledger:[], wrong:[], stats:{solved:0,correct:0,bestCombo:0}, daily:{date:'',earned:0,ai:0}, seen:{} }, raw || {});
   S.settings = Object.assign({}, DEF_SETTINGS, S.settings || {});
   S.settings.reward = Object.assign({}, DEF_SETTINGS.reward, S.settings.reward || {});
+  S.pet = Object.assign({}, DEF_PET, S.pet || {});
   if (!raw) S.ledger.push({ t:Date.now(), memo:'통장 만들기', in:0, out:0, bal:0 });
 }
 function save(){ try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e) {} }
-function daily(){ if (S.daily.date !== today()) S.daily = { date:today(), earned:0, ai:0 }; return S.daily; }
+function daily(){ if (S.daily.date !== today()) S.daily = { date:today(), earned:0, ai:0, spent:0 }; return S.daily; }
 function addLedger(memo, amt){ S.ledger.push({ t:Date.now(), memo, in:amt>0?amt:0, out:amt<0?-amt:0, bal:S.balance }); if (S.ledger.length > 300) S.ledger = S.ledger.slice(-300); }
 
 function toast(msg){ const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => t.hidden = true, 2200); }
@@ -257,11 +288,19 @@ function home(){
     const has = ok && unitsFor(sb.id).length > 0;
     if (!ok && s.grade > Math.max(...sb.grades)) return '';
     const sub = !ok ? `${Math.min(...sb.grades)}학년부터 열려요` : has ? (sb.sub || unitsFor(sb.id).map((u) => u.name.replace(' (복습)','')).slice(0,3).join(' · ')) : '문제 준비 중';
-    return `<button class="sbtn ${has ? '' : 'locked'}" style="--c:${sb.c}" ${has ? `data-subj="${sb.id}"` : 'aria-disabled="true"'}><span class="disp">${sb.name}</span><small>${esc(sub)}</small></button>`;
+    return `<button class="sbtn ${has ? '' : 'locked'}" style="--c:${sb.c}" ${has ? `data-subj="${sb.id}"` : 'aria-disabled="true"'}><img class="sicon" src="img/subj/${sb.id}.webp" alt="" width="36" height="36"><span class="disp">${sb.name}</span><small>${esc(sub)}</small></button>`;
   }).join('');
   const reached = S.balance >= s.goal;
+  petTick();
+  const p = S.pet, si = petStage(), mood = petMood(), next = PET_STAGES[si + 1];
   $('#view').innerHTML = `
     ${reached ? `<button class="cta-reward" id="goCert"><span class="disp" style="font-size:34px">★</span><span><span class="disp">용돈 받을 준비 완료!</span><br><small>칭찬 카드를 만들어 엄마·아빠께 보내요</small></span></button>` : ''}
+    <button class="card petcard" id="goPet">
+      ${petFigure(si, mood, 84)}
+      <span style="flex:1;min-width:0"><span class="disp">${PET_NAME} · ${PET_STAGES[si].name}</span>
+        <span class="note">${mood === 'hungry' ? '<b style="color:var(--bad)">배고파요! 먹이를 주세요</b>' : next ? `다음 단계까지 ${next.need - p.exp}문제` : '다 자랐어요! 새 알을 받을 수 있어요'}</span>
+        <span class="gauge ${p.full < PET_HUNGRY ? 'low' : ''}" role="progressbar" aria-label="배부름" aria-valuenow="${p.full}" aria-valuemin="0" aria-valuemax="100"><i style="width:${p.full}%"></i></span></span>
+    </button>
     <div class="card" style="display:flex;flex-direction:column;gap:12px">
       <div class="row"><h2 style="font-size:24px">오늘은 뭘 풀어 볼까?</h2><span class="note" style="margin-left:auto">오늘 ${won(d.earned)} / ${won(s.dailyCap)}</span></div>
       <div class="subj">${subjHtml}</div>
@@ -275,7 +314,7 @@ function home(){
     <p class="note center">푼 문제 ${S.stats.solved}개 · 정답률 ${S.stats.solved ? Math.round(S.stats.correct / S.stats.solved * 100) : 0}% · 최고 콤보 ${S.stats.bestCombo}</p>`;
   $('#view').querySelectorAll('[data-subj]').forEach((b) => b.onclick = () => setup(b.dataset.subj));
   $('#goWrong').onclick = () => S.wrong.length ? startReview() : toast('틀린 문제가 없어요. 멋져요!');
-  $('#goAI').onclick = aiChat; $('#goLedger').onclick = ledger; $('#goParent').onclick = parentGate;
+  $('#goAI').onclick = aiChat; $('#goLedger').onclick = ledger; $('#goParent').onclick = parentGate; $('#goPet').onclick = () => petView();
   if (reached) $('#goCert').onclick = cert;
 }
 
@@ -349,7 +388,7 @@ function answer(val){
   const correct = q.type === 'mc' ? val === q.answer : val === q.answer;
   S.stats.solved++;
   S.seen[q.key] = (S.seen[q.key] || 0) + 1;
-  let gain = 0, bonusMsg = '';
+  let gain = 0, bonusMsg = '', petMsg = '';
   if (correct) {
     S.stats.correct++; R.correct++; R.combo++; S.stats.bestCombo = Math.max(S.stats.bestCombo, R.combo);
     gain = s.reward[q.diff]; if (R.review) gain = Math.floor(gain / 2); if (R.hint) gain = Math.floor(gain / 2);
@@ -359,6 +398,9 @@ function answer(val){
     S.balance += gain; d.earned += gain; R.earned += gain;
     if (R.review) S.wrong = S.wrong.filter((w) => w.key !== q.key);
     if (gain > 0) popCoin('+' + won(gain));
+    const grew = petGrow();
+    if (grew === 'up') petMsg = `${PET_NAME}가 ${PET_STAGES[petStage()].name}${petStage() === PET_STAGES.length - 1 ? '가 되었어요! 도감에 기록했어요' : '로 자랐어요!'}`;
+    else if (grew === 'hungry' && !R.hungryNoted) { R.hungryNoted = true; petMsg = `${PET_NAME}가 배고파서 자라지 못했어요. 먹이를 주세요!`; }
   } else {
     R.combo = 0;
     const loss = Math.min(s.penalty, S.balance);
@@ -371,10 +413,12 @@ function answer(val){
   if (q.type === 'mc') $('#answerArea').querySelectorAll('.choice').forEach((b) => { b.disabled = true; const i = +b.dataset.i; if (i === q.answer) b.classList.add('ok'); else if (i === val) b.classList.add('no'); });
   else { const box = $('#ansbox'); box.style.borderColor = correct ? 'var(--ok)' : 'var(--bad)'; }
   const right = q.type === 'mc' ? q.choices[q.answer] : q.answer;
+  const fbPet = petStage() >= 2 ? `<img class="fb-pet" src="img/pet/${correct ? 'cheer' : 'cheerup'}.webp" alt="" width="76" height="76">` : '';
   $('#fb').innerHTML = `<div class="feedback ${correct ? 'ok' : 'no'}">
-      <span class="disp">${correct ? pick(['정답이에요!','척척 맞혔어요!','와, 대단해요!','딩동댕!']) : '아쉬워요! 정답은 ' + esc(right)}</span>
+      <span class="disp">${fbPet}${correct ? pick(['정답이에요!','척척 맞혔어요!','와, 대단해요!','딩동댕!']) : '아쉬워요! 정답은 ' + esc(right)}</span>
       <span>${esc(q.explain || '')}</span>
       ${bonusMsg ? `<b>${esc(bonusMsg)}</b>` : ''}
+      ${petMsg ? `<b>${esc(petMsg)}</b>` : ''}
       ${!correct && gain < 0 ? `<span class="note">${won(-gain)}이 빠졌어요</span>` : ''}
     </div>`;
   $('#qtools').innerHTML = `<button class="btn primary block" id="next">${R.i + 1 < R.list.length ? '다음 문제' : '결과 보기'}</button>`;
@@ -420,6 +464,126 @@ function finishRound(){
       <button class="btn primary block" id="again">처음으로</button>
     </div>`;
   $('#again').onclick = home; if (reached) $('#goCert').onclick = cert;
+}
+
+// ───── 펫(다람쥐 도토리) ─────
+// 성장은 맞힌 문제 수, 먹이·꾸미기는 적립금으로 산다. 배부름이 PET_HUNGRY 미만이면 성장이 멈춘다(줄어들지는 않음).
+const PET_NAME = '도토리';
+const PET_HUNGRY = 30, PET_DECAY = 30; // 배고픔 기준, 하루에 줄어드는 배부름
+const PET_STAGES = [
+  { need:0,   name:'도토리 알',   img:'stage1' },
+  { need:20,  name:'아기 다람쥐', img:'stage2' },
+  { need:80,  name:'어린이 다람쥐', img:'stage3' },
+  { need:200, name:'씩씩한 다람쥐', img:'stage4' },
+  { need:400, name:'왕 다람쥐',   img:'stage5' },
+];
+const FOODS = [
+  { id:'seeds',  name:'해바라기씨', price:10, full:15 },
+  { id:'acorn',  name:'도토리',     price:20, full:30 },
+  { id:'walnut', name:'호두',       price:40, full:70 },
+];
+const DECOS = [
+  { id:'bow',   name:'리본',       price:100, wear:true },
+  { id:'hat',   name:'파티 모자',  price:150, wear:true },
+  { id:'leaf',  name:'나뭇잎 이불', price:200 },
+  { id:'house', name:'통나무 집',  price:500 },
+];
+// 그림마다 머리 위치 (그림 크기 대비 %) : [왼쪽, 위, 너비, 기울기]
+const WEAR_POS = {
+  stage2:  { hat:[27,-6,26,-12], bow:[48,14,20,12] },
+  stage3:  { hat:[46,-6,26,8],   bow:[64,12,18,14] },
+  stage4:  { hat:[54,-6,24,10],  bow:[70,14,18,14] },
+  stage5:  {                     bow:[68,16,18,14] }, // 왕관이 있어서 모자는 안 씀
+  happy:   { hat:[46,-6,26,6],   bow:[66,10,20,14] },
+  hungry:  { hat:[40,2,24,-4],   bow:[64,14,18,12] },
+  sleepy:  { hat:[46,2,24,6],    bow:[66,22,18,14] },
+};
+const dayNum = (s) => { const [y, m, d] = s.split('-').map(Number); return Math.round(new Date(y, m - 1, d).getTime() / 86400000); };
+function petTick(){
+  const p = S.pet, t = today();
+  if (!p.lastDay) { p.lastDay = t; save(); return; }
+  const days = dayNum(t) - dayNum(p.lastDay);
+  if (days > 0) { p.full = Math.max(0, p.full - PET_DECAY * days); p.lastDay = t; save(); }
+}
+function petStage(exp = S.pet.exp){ let i = 0; PET_STAGES.forEach((st, k) => { if (exp >= st.need) i = k; }); return i; }
+function petMood(){
+  if (S.pet.full < PET_HUNGRY) return 'hungry';
+  const h = new Date().getHours(); if (h >= 21 || h < 7) return 'sleepy';
+  return 'happy';
+}
+// 정답 1개마다 호출. 'up'(단계 올라감) | 'hungry'(배고파서 못 큼) | 'grow' | 'max'
+function petGrow(){
+  petTick(); const p = S.pet;
+  if (petStage() === PET_STAGES.length - 1) return 'max';
+  if (p.full < PET_HUNGRY) return 'hungry';
+  const before = petStage(); p.exp++;
+  if (petStage() === before) return 'grow';
+  if (petStage() === PET_STAGES.length - 1) p.dex.push({ date:today(), no:p.dex.length + 1 });
+  return 'up';
+}
+function petImg(si, mood){
+  // 어린이 단계는 기분 그림을 쓰고, 씩씩한 단계는 배고프거나 졸릴 때만 기분 그림을 쓴다
+  if (si === 2 || (si === 3 && mood !== 'happy')) return mood;
+  return PET_STAGES[si].img;
+}
+function petFigure(si, mood, size, cls = ''){
+  const img = petImg(si, mood), pos = WEAR_POS[img] || {};
+  const wears = si === 0 ? '' : S.pet.wear.filter((w) => pos[w]).map((w) => { const [l, t, wd, r] = pos[w];
+    return `<img class="wear" src="img/item/${w}.webp" alt="" style="left:${l}%;top:${t}%;width:${wd}%;transform:rotate(${r}deg)">`; }).join('');
+  return `<span class="pet ${cls}" style="${size ? `width:${size}px` : ''}"><img src="img/pet/${img}.webp" alt="${PET_NAME} (${PET_STAGES[si].name})" width="512" height="512">${wears}</span>`;
+}
+function petBuy(item, isFood){
+  const p = S.pet, d = daily(), cap = S.settings.petCap, spent = d.spent || 0;
+  if (!isFood && p.owned.includes(item.id)) return;
+  if (isFood && p.full >= 100) return toast(`${PET_NAME}는 지금 배불러요!`);
+  if (S.balance < item.price) return toast('잔액이 모자라요. 문제를 풀어서 모아 봐요!');
+  if (spent + item.price > cap) return toast(`오늘은 ${won(cap)}까지만 쓸 수 있어요. 내일 또 사요!`);
+  S.balance -= item.price; d.spent = spent + item.price;
+  if (isFood) p.full = Math.min(100, p.full + item.full);
+  else { p.owned.push(item.id); if (item.wear) p.wear.push(item.id); }
+  addLedger(`${item.name} (${PET_NAME})`, -item.price); save(); renderBook();
+  petView(isFood ? `냠냠! ${item.name} 맛있어요!` : `${item.name}${/[가-힣]$/.test(item.name) && (item.name.charCodeAt(item.name.length - 1) - 0xAC00) % 28 ? '을' : '를'} 샀어요!`, true);
+}
+function petView(say, hop){
+  petTick(); renderBook();
+  const p = S.pet, si = petStage(), mood = petMood(), next = PET_STAGES[si + 1], d = daily();
+  const cur = PET_STAGES[si].need, pct = next ? Math.round((p.exp - cur) / (next.need - cur) * 100) : 100;
+  const line = say || { hungry:'배고파요… 먹이를 주세요!', sleepy:'쿨쿨… 졸려요. 내일 또 공부하자!', happy:pick(['오늘도 같이 공부하자!','문제를 맞히면 내가 쑥쑥 자라!','나랑 도토리 모으러 갈래?']) }[mood];
+  const done = si === PET_STAGES.length - 1;
+  $('#view').innerHTML = `<div class="card" style="display:flex;flex-direction:column;gap:12px">
+    <div class="row"><h2 style="font-size:24px">${PET_NAME} · ${PET_STAGES[si].name}</h2><span class="note" style="margin-left:auto">오늘 쓴 돈 ${won(d.spent || 0)} / ${won(S.settings.petCap)}</span></div>
+    <div class="bubble" aria-live="polite">${esc(line)}</div>
+    <div class="room">
+      ${p.owned.includes('house') ? '<img class="house" src="img/item/house.webp" alt="통나무 집">' : ''}
+      ${p.owned.includes('leaf') ? '<img class="blanket" src="img/item/leaf.webp" alt="나뭇잎 이불">' : ''}
+      ${petFigure(si, mood, 0, hop ? 'hop' : '')}
+    </div>
+    <div><div class="row note"><span>배부름</span><span class="num" style="margin-left:auto">${p.full} / 100</span></div>
+      <div class="gauge ${p.full < PET_HUNGRY ? 'low' : ''}" role="progressbar" aria-label="배부름" aria-valuenow="${p.full}" aria-valuemin="0" aria-valuemax="100"><i style="width:${p.full}%"></i></div></div>
+    <div><div class="row note"><span>${done ? '다 자랐어요!' : `${next.name}까지`}</span><span class="num" style="margin-left:auto">${done ? `맞힌 문제 ${p.exp}개` : `${p.exp - cur} / ${next.need - cur}문제`}</span></div>
+      <div class="gauge exp" role="progressbar" aria-label="성장" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div></div>
+    <p class="note">문제를 맞히면 자라요. 배부름이 ${PET_HUNGRY}보다 적으면 자라지 못하고, 하루가 지나면 배부름이 ${PET_DECAY}씩 줄어요.</p>
+    ${done ? `<button class="btn coin block" id="newEgg">새 도토리 알 받기</button>` : ''}
+  </div>
+  <div class="card" style="display:flex;flex-direction:column;gap:10px">
+    <h3 style="font-size:20px">먹이 주기</h3>
+    <div class="shop">${FOODS.map((f) => `<button class="item" data-food="${f.id}"><img src="img/item/${f.id}.webp" alt="" width="52" height="52">${f.name}<small class="num">${won(f.price)} · 배부름 +${f.full}</small></button>`).join('')}</div>
+    <h3 style="font-size:20px">꾸미기</h3>
+    <div class="shop">${DECOS.map((o) => { const has = p.owned.includes(o.id), on = p.wear.includes(o.id);
+      return `<button class="item" data-deco="${o.id}" ${o.wear && has ? `aria-pressed="${on}"` : ''}><img src="img/item/${o.id}.webp" alt="" width="52" height="52">${o.name}<small class="num">${has ? (o.wear ? (on ? '쓰는 중 · 벗기' : '쓰기') : '가지고 있어요') : won(o.price)}</small></button>`; }).join('')}</div>
+    <p class="note">산 물건은 통장에 '나간 돈'으로 적혀요.</p>
+  </div>
+  ${p.dex.length ? `<div class="card"><h3 style="font-size:20px">도감</h3><p>지금까지 키운 왕 다람쥐 <b>${p.dex.length}마리</b></p><p class="note">${p.dex.map((x) => `${x.no}호 ${x.date}`).join(' · ')}</p></div>` : ''}
+  <button class="btn block" id="back">돌아가기</button>`;
+  $('#view').querySelectorAll('[data-food]').forEach((b) => b.onclick = () => petBuy(FOODS.find((f) => f.id === b.dataset.food), true));
+  $('#view').querySelectorAll('[data-deco]').forEach((b) => b.onclick = () => {
+    const o = DECOS.find((x) => x.id === b.dataset.deco);
+    if (!p.owned.includes(o.id)) return petBuy(o, false);
+    if (!o.wear) return;
+    p.wear = p.wear.includes(o.id) ? p.wear.filter((w) => w !== o.id) : p.wear.concat(o.id); save(); petView();
+  });
+  if (done) $('#newEgg').onclick = () => { p.exp = 0; p.full = 100; save(); petView('새 도토리 알이에요! 문제를 풀면 깨어나요.', true); };
+  $('#back').onclick = home;
 }
 
 // ───── 통장 ─────
@@ -548,6 +712,7 @@ function parent(){
       <label class="row"><input type="checkbox" id="sReview" ${s.review ? 'checked' : ''}> 지난 학기 복습 단원도 넣기</label>
       <div class="grid2">${f('r1', '쉬움 정답(원)', s.reward[1])}${f('r2', '보통 정답(원)', s.reward[2])}${f('r3', '어려움 정답(원)', s.reward[3])}${f('sCombo', '5콤보 보너스(원)', s.comboBonus)}${f('sPen', '틀리면 빼기(원, 0=안 뺌)', s.penalty)}${f('sCap', '하루 적립 한도(원)', s.dailyCap)}</div>
       ${f('sGoal', '목표 금액(원) — 채우면 칭찬 카드', s.goal)}
+      ${f('sPetCap', '펫 먹이·꾸미기에 하루 쓸 수 있는 돈(원)', s.petCap)}
       ${f('sPin', '부모 비밀번호(숫자 4자리)', s.pin, 'text', 'inputmode="numeric" maxlength="4" pattern="[0-9]{4}"')}
       <hr><h3 style="font-size:20px">AI 친구 연결</h3>
       ${f('sAiUrl', 'AI 서버 주소 (Supabase 함수 URL)', s.aiUrl, 'url', 'placeholder="https://xxxx.supabase.co/functions/v1/kid-tutor"')}
@@ -558,7 +723,7 @@ function parent(){
     </div>
     <div class="card" style="display:flex;flex-direction:column;gap:10px">
       <h2 style="font-size:20px">초기화</h2>
-      <p class="note">잔액·거래내역·오답노트를 모두 지웁니다. 설정은 남아요.</p>
+      <p class="note">잔액·거래내역·오답노트·펫을 모두 지웁니다. 설정은 남아요.</p>
       <div id="resetArea"><button class="btn danger" id="reset">모두 지우기</button></div>
     </div>
     <button class="btn block" id="back">나가기</button>`;
@@ -567,7 +732,7 @@ function parent(){
   $('#bonus').onclick = () => { const a = n('payAmt'); if (!a) return toast('금액을 넣어 주세요'); S.balance += a; addLedger('칭찬 보너스', a); save(); toast(won(a) + ' 넣었어요'); parent(); };
   $('#saveS').onclick = () => {
     const pin = v('sPin'); if (!/^\d{4}$/.test(pin)) return toast('비밀번호는 숫자 4자리예요');
-    Object.assign(s, { name:v('sName').trim() || '우리 아이', grade:+v('sGrade'), sem:+v('sSem'), review:$('#sReview').checked, reward:{1:n('r1'),2:n('r2'),3:n('r3')}, comboBonus:n('sCombo'), penalty:n('sPen'), dailyCap:n('sCap'), goal:n('sGoal', 100), pin, aiUrl:v('sAiUrl').trim(), aiToken:v('sAiTok').trim(), aiDaily:n('sAiDaily') });
+    Object.assign(s, { name:v('sName').trim() || '우리 아이', grade:+v('sGrade'), sem:+v('sSem'), review:$('#sReview').checked, reward:{1:n('r1'),2:n('r2'),3:n('r3')}, comboBonus:n('sCombo'), penalty:n('sPen'), dailyCap:n('sCap'), goal:n('sGoal', 100), petCap:n('sPetCap'), pin, aiUrl:v('sAiUrl').trim(), aiToken:v('sAiTok').trim(), aiDaily:n('sAiDaily') });
     save(); renderBook(); toast('저장했어요');
   };
   $('#reset').onclick = () => {

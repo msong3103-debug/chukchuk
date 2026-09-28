@@ -1,3 +1,7 @@
 # Supabase CLI가 만드는 임시 파일
 supabase/.temp/
 .env
+.claude/launch.json
+
+# 제미나이 원본 이미지 (용량이 커서 올리지 않음)
+img/Gemini_*

@@ -3,7 +3,10 @@
 // 필요한 비밀값(Secrets): ANTHROPIC_API_KEY, APP_TOKEN
 // 배포: supabase functions deploy kid-tutor --no-verify-jwt
 
-const MODEL = "claude-haiku-4-5-20251001";
+const MODEL = "claude-opus-5";
+// Opus 5는 생각(thinking)이 기본으로 켜져 있고 max_tokens에 생각이 포함된다. 답 길이는 프롬프트로 조절한다.
+const MAX_TOKENS = 2000;
+const REFUSED = "그건 척척이가 대답하기 어려운 이야기예요. 엄마 아빠께 여쭤보자!";
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "content-type, x-app-token",
@@ -25,6 +28,13 @@ const BASE = (grade: number, name: string) => `
 - 아이가 다쳤다, 누가 괴롭힌다, 무섭다, 많이 슬프다고 하면 걱정해 주고, 지금 바로 엄마 아빠나 선생님께 말하라고 꼭 알려 줘.
 - 모르는 건 모른다고 말하고 지어내지 마.
 - 오래 대화하도록 붙잡지 말고, 공부와 호기심을 칭찬해 줘.
+`.trim();
+
+const CURIOUS = (grade: number) => `
+호기심 질문
+- 답을 한 뒤 마지막에, 방금 이야기와 이어지는 짧은 "궁금증 질문"을 하나 던져 줘. 예: "그럼 밤하늘은 왜 까만색일까?"
+- ${grade}학년이 스스로 생각하거나 주변에서 관찰해 볼 수 있는 질문으로 해. 정답은 바로 알려 주지 마.
+- 아이가 슬프거나 무섭거나 다쳤다고 말했을 때, 또는 부모님께 여쭤보라고 안내한 경우에는 질문을 붙이지 마.
 `.trim();
 
 const HINT = `
@@ -66,6 +76,7 @@ Deno.serve(async (req) => {
     ].filter(Boolean);
     messages = [{ role: "user", content: lines.join("\n") }];
   } else {
+    system += "\n\n" + CURIOUS(grade);
     const list = Array.isArray(body.messages) ? body.messages.slice(-8) : [];
     messages = list
       .filter((m: any) => (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
@@ -79,11 +90,22 @@ Deno.serve(async (req) => {
 
   const r = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
-    headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-    body: JSON.stringify({ model: MODEL, max_tokens: 350, system, messages }),
+    headers: {
+      "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json",
+      // 안전 분류기가 거절하면 서버에서 알맞은 모델로 다시 시도한다
+      "anthropic-beta": "server-side-fallback-2026-07-01",
+    },
+    body: JSON.stringify({
+      model: MODEL, max_tokens: MAX_TOKENS, system, messages,
+      output_config: { effort: "low" }, // 짧은 대화라 가볍게 생각하게 한다
+      fallbacks: "default",
+    }),
   });
   if (!r.ok) return bad(502, "ai error " + r.status);
   const j = await r.json();
+  // 거절되면 content가 비어 있거나 중간까지만 있으므로, 내용을 읽기 전에 먼저 확인한다
+  if (j.stop_reason === "refusal") return new Response(JSON.stringify({ text: REFUSED }), { headers: { ...CORS, "content-type": "application/json" } });
   const text = (j.content || []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("").trim();
+  if (!text) return bad(502, "empty answer (" + j.stop_reason + ")");
   return new Response(JSON.stringify({ text }), { headers: { ...CORS, "content-type": "application/json" } });
 });
