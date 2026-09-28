@@ -114,5 +114,35 @@
     return { q, answer: choices.indexOf(ans), choices, value: ans, kind: k, a, b };
   }
 
-  window.GameData = { PLANETS, planetSVG, WORDS, wordTiles, speedQ };
+  // ───── 스티커 앨범 ─────
+  // 앨범은 차례로 열린다(앞 앨범을 다 모으면 다음 앨범). 그림: 태양계는 img/planet, 나머지는 img/sticker/{id}.webp
+  const STICKER_SETS = [
+    { id:'planet', name:'태양계', color:'#162447' },
+    { id:'space',  name:'우주 탐험', color:'#2a1f4f' },
+    { id:'animal', name:'동물 친구들', color:'#5b4033' }, // 초록 동물이 많아 따뜻한 코코아색 배경
+  ];
+  const STICKERS = [
+    ...PLANETS.map((p) => ({ id:p.id, set:'planet', ko:p.ko, en:p.en, fact:p.fact })),
+    { id:'moon',      set:'space', ko:'달',        en:'Moon',          fact:'지구 둘레를 도는 위성이에요. 스스로 빛을 내지 않고 햇빛을 받아 빛나요.' },
+    { id:'rocket',    set:'space', ko:'로켓',      en:'Rocket',        fact:'뜨거운 가스를 뒤로 힘차게 내뿜어서 하늘 높이 올라가요.' },
+    { id:'astronaut', set:'space', ko:'우주비행사', en:'Astronaut',     fact:'우주에서는 몸이 둥둥 떠서, 침낭을 벽에 묶고 잠을 자요.' },
+    { id:'satellite', set:'space', ko:'인공위성',  en:'Satellite',     fact:'사람이 만들어 지구 둘레를 돌게 한 기계예요. 날씨를 알려 주기도 해요.' },
+    { id:'station',   set:'space', ko:'우주정거장', en:'Space Station', fact:'우주비행사들이 머물면서 실험을 하는 커다란 우주 집이에요.' },
+    { id:'comet',     set:'space', ko:'혜성',      en:'Comet',         fact:'얼음과 먼지로 된 덩어리예요. 태양에 가까워지면 긴 꼬리가 생겨요.' },
+    { id:'meteor',    set:'space', ko:'별똥별',    en:'Meteor',        fact:'우주의 작은 돌 조각이 공기와 부딪혀 타면서 빛나는 거예요.' },
+    { id:'telescope', set:'space', ko:'망원경',    en:'Telescope',     fact:'멀리 있는 별과 행성을 크게 보여 주는 도구예요.' },
+    { id:'galaxy',    set:'space', ko:'은하수',    en:'Milky Way',     fact:'수많은 별이 모여 밤하늘에 강처럼 보이는 거예요. 태양도 우리은하의 별이에요.' },
+    { id:'penguin',   set:'animal', ko:'펭귄',     en:'Penguin',       fact:'날지는 못하지만 헤엄을 아주 잘 쳐요.' },
+    { id:'koala',     set:'animal', ko:'코알라',   en:'Koala',         fact:'유칼립투스 잎을 먹고, 하루에 아주 오래 잠을 자요.' },
+    { id:'panda',     set:'animal', ko:'판다',     en:'Panda',         fact:'대나무를 아주 좋아해서 하루 종일 먹어요.' },
+    { id:'giraffe',   set:'animal', ko:'기린',     en:'Giraffe',       fact:'땅 위에 사는 동물 가운데 키가 가장 커요.' },
+    { id:'octopus',   set:'animal', ko:'문어',     en:'Octopus',       fact:'다리가 여덟 개예요. 위험하면 먹물을 뿜고 도망가요.' },
+    { id:'otter',     set:'animal', ko:'해달',     en:'Sea Otter',     fact:'물 위에 누워서 배 위에 조개를 올려놓고 먹어요.' },
+    { id:'hedgehog',  set:'animal', ko:'고슴도치', en:'Hedgehog',      fact:'위험하면 몸을 동그랗게 말아서 가시로 몸을 지켜요.' },
+    { id:'polarbear', set:'animal', ko:'북극곰',   en:'Polar Bear',    fact:'눈과 얼음이 많은 북극에 살아요. 헤엄도 잘 쳐요.' },
+    { id:'hummingbird', set:'animal', ko:'벌새',   en:'Hummingbird',   fact:'날갯짓이 아주 빨라서 공중에 멈춰 있을 수 있어요.' },
+  ];
+  const stickerSrc = (st) => (st.set === 'planet' ? `img/planet/${st.id}.webp` : `img/sticker/${st.id}.webp`);
+
+  window.GameData = { PLANETS, planetSVG, WORDS, wordTiles, speedQ, STICKER_SETS, STICKERS, stickerSrc };
 })();

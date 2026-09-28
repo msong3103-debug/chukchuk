@@ -113,9 +113,17 @@ h1,h2,h3,.disp{font-family:var(--display);font-weight:400;margin:0;text-wrap:bal
 .stamp small{font-size:12px;color:var(--muted)}
 /* 우주 스티커 */
 .stk-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.stk{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 4px;border-radius:16px;background:#162447;color:#fff;border:2px solid #2b3d6b;min-height:48px;font-family:var(--display);font-size:16px}
+.stk{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 4px;border-radius:16px;background:var(--stk-bg,#162447);color:#fff;border:2px solid rgba(255,255,255,.15);min-height:48px;font-family:var(--display);font-size:16px}
 .stk img{width:72px;height:72px}
-.stk.none img{filter:brightness(0) opacity(.35)}
+.stk.none img,.stk.none .stk-ph{filter:brightness(0) opacity(.35)}
+.stk-ph{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;background:var(--coin);color:var(--coin-ink);font-family:var(--display);font-size:32px;border:3px solid #18352f}
+/* 반짝 스티커: 같은 스티커 3장 */
+.stk.shiny,.stk-big.shiny{border:3px solid transparent;background:linear-gradient(var(--stk-bg,#162447),var(--stk-bg,#162447)) padding-box,linear-gradient(120deg,#ff7eb3,#ffd54a,#7ee8a2,#6fc9ff,#c79bff,#ff7eb3) border-box;background-size:100% 100%,300% 300%;animation:shine 3s linear infinite}
+.stk.shiny img,.stk-big.shiny img{filter:drop-shadow(0 0 6px #fff6b0)}
+.stk-big{display:inline-flex;border-radius:24px;padding:6px}
+.stk-big.shiny{--stk-bg:var(--panel)}
+@keyframes shine{to{background-position:0 0,300% 0}}
+@media (prefers-reduced-motion:reduce){.stk.shiny,.stk-big.shiny{animation:none}}
 .stk.none span{color:#9aa6c4}
 .stk small{position:absolute;top:6px;right:8px;font-size:13px;color:var(--coin)}
 .stk-pop{position:fixed;inset:0;z-index:50;background:rgba(10,20,40,.55);display:flex;align-items:center;justify-content:center;padding:16px}
@@ -140,6 +148,9 @@ h1,h2,h3,.disp{font-family:var(--display);font-weight:400;margin:0;text-wrap:bal
 .mcard.done{border-color:var(--ok);background:var(--ok-bg)}
 .mcard img{width:100%;height:auto}
 .mcard .back{font-size:26px;color:var(--coin)}
+.mcard .face{display:none;width:100%}
+.mcard.open .face,.mcard.done .face{display:block}
+.mcard.open .back,.mcard.done .back{display:none}
 .orbit{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .obtn{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;border-radius:14px;border:2px solid var(--line);background:var(--panel2);font-size:14px;min-height:48px}
 .obtn img{width:52px;height:52px}
@@ -175,6 +186,7 @@ h1,h2,h3,.disp{font-family:var(--display);font-weight:400;margin:0;text-wrap:bal
 .chips{display:flex;flex-wrap:wrap;gap:8px}
 .chip{padding:8px 14px;border-radius:99px;border:2px solid var(--line);background:var(--panel2);font-size:15px}
 .chip[aria-pressed="true"]{border-color:var(--brand);background:var(--brand);color:var(--brand-ink)}
+.chip[disabled]{opacity:.45}
 .diffs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .diff{padding:12px 6px;border-radius:14px;border:2px solid var(--line);background:var(--panel2);text-align:center}
 .diff .disp{display:block;font-size:20px}
@@ -364,40 +376,66 @@ function sfx(kind){
   } catch (e) { /* 소리가 안 나도 앱은 그대로 */ }
 }
 
-// ───── 우주 스티커 ─────
-const STICKER_DAILY = 3;
-// 스티커 한 장 주기: 아직 없는 것을 먼저. 하루 STICKER_DAILY장까지. 받은 행성(또는 null)을 돌려준다
+// ───── 스티커 앨범 ─────
+// 앨범은 차례로 열린다(앞 앨범을 다 모으면 다음 앨범). 같은 스티커를 SHINY_AT장 모으면 반짝 스티커. 하루 STICKER_DAILY장까지
+const STICKER_DAILY = 3, SHINY_AT = 3;
+const STK = () => window.GameData.STICKERS, SETS = () => window.GameData.STICKER_SETS;
+const setItems = (setId) => STK().filter((x) => x.set === setId);
+const setDone = (setId) => setItems(setId).every((x) => S.stickers[x.id]);
+const stkCount = () => STK().filter((x) => S.stickers[x.id]).length;
+// 열린 앨범: 첫 앨범 + 바로 앞 앨범을 다 모은 앨범
+function openSets(){ const out = []; for (const s of SETS()) { out.push(s.id); if (!setDone(s.id)) break; } return out; }
+function stkImg(st, size){ return `<img src="${window.GameData.stickerSrc(st)}" data-stk="${esc(st.ko)}" alt="" width="${size}" height="${size}">`; }
+// 그림이 아직 없는 스티커는 동그란 글자 스티커로 대신 보여 준다
+document.addEventListener('error', (e) => {
+  const im = e.target; if (!(im instanceof HTMLImageElement) || !im.dataset.stk) return;
+  const ph = document.createElement('span'); ph.className = 'stk-ph'; ph.textContent = im.dataset.stk.slice(0, 1);
+  ph.style.width = ph.style.height = im.getAttribute('width') + 'px'; im.replaceWith(ph);
+}, true);
+// 스티커 한 장 주기: 열린 앨범에서 아직 없는 것을 먼저. 받은 스티커(또는 null)를 돌려준다
 function grantSticker(){
   const d = daily(); d.stickers = d.stickers || 0;
   if (d.stickers >= STICKER_DAILY) return null;
-  const all = window.GameData.PLANETS, missing = all.filter((p) => !S.stickers[p.id]);
-  const p = (missing.length ? missing : all)[Math.floor(Math.random() * (missing.length || all.length))];
-  S.stickers[p.id] = (S.stickers[p.id] || 0) + 1; d.stickers++; save();
-  setTimeout(() => showSticker(p, S.stickers[p.id] === 1), 400);
-  return p;
+  const open = openSets(), pool = STK().filter((x) => open.includes(x.set)), missing = pool.filter((x) => !S.stickers[x.id]);
+  const from = missing.length ? missing : pool, st = from[Math.floor(Math.random() * from.length)];
+  const wasDone = setDone(st.set);
+  S.stickers[st.id] = (S.stickers[st.id] || 0) + 1; d.stickers++; save();
+  const n = S.stickers[st.id];
+  let extra = '';
+  if (!wasDone && setDone(st.set)) {
+    const set = SETS().find((x) => x.id === st.set), next = SETS()[SETS().indexOf(set) + 1];
+    extra = `'${set.name}' 앨범 완성!` + (next ? ` 새 앨범 '${next.name}'이 열렸어요!` : ' 모든 앨범을 다 모았어요!');
+  } else if (n === SHINY_AT) extra = '3장을 모아서 반짝 스티커로 변신했어요!';
+  setTimeout(() => showSticker(st, n, extra), 400);
+  return st;
 }
-function showSticker(p, isNew){
-  const el = document.createElement('div'); el.className = 'stk-pop'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', '우주 스티커를 받았어요');
-  el.innerHTML = `<div class="stk-card"><div class="eyebrow">${isNew ? '새 우주 스티커!' : '우주 스티커 한 장 더!'}</div>
-    <img src="img/planet/${p.id}.webp" alt="" width="140" height="140"><div class="disp" style="font-size:26px">${p.ko} <small class="note">${p.en}</small></div>
-    <p style="margin:0">${esc(p.fact)}</p><button class="btn primary block">좋아요!</button></div>`;
+function showSticker(st, n, extra){
+  const el = document.createElement('div'); el.className = 'stk-pop'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', '스티커를 받았어요');
+  el.innerHTML = `<div class="stk-card"><div class="eyebrow">${n === 1 ? '새 스티커!' : n >= SHINY_AT ? '반짝 스티커!' : `스티커 한 장 더! (${n}장)`}</div>
+    <span class="stk-big ${n >= SHINY_AT ? 'shiny' : ''}">${stkImg(st, 140)}</span><div class="disp" style="font-size:26px">${esc(st.ko)} <small class="note">${esc(st.en)}</small></div>
+    <p style="margin:0">${esc(st.fact)}</p>${extra ? `<p style="margin:0"><b>${esc(extra)}</b></p>` : ''}<button class="btn primary block">좋아요!</button></div>`;
   document.body.appendChild(el); sfx('win');
   const close = () => el.remove(); el.querySelector('button').onclick = close; el.onclick = (e) => { if (e.target === el) close(); };
   el.querySelector('button').focus();
 }
-function stickerView(){
-  const all = window.GameData.PLANETS, have = all.filter((p) => S.stickers[p.id]).length;
+function stickerView(setId){
+  const open = openSets(); setId = setId && open.includes(setId) ? setId : open[open.length - 1];
+  const set = SETS().find((x) => x.id === setId), items = setItems(setId), have = items.filter((x) => S.stickers[x.id]).length;
   $('#view').innerHTML = `<div class="card" style="display:flex;flex-direction:column;gap:12px">
-    <h2 style="font-size:24px">우주 스티커 도감</h2>
-    <p>${have} / ${all.length}장 모았어요${have === all.length ? ' · <b>태양계 박사 달성!</b>' : ''}</p>
-    <div class="stk-grid">${all.map((p) => { const n = S.stickers[p.id] || 0;
-      return `<button class="stk ${n ? '' : 'none'}" data-id="${p.id}" aria-label="${n ? p.ko + ' 스티커 ' + n + '장' : '아직 못 모은 스티커'}"><img src="img/planet/${p.id}.webp" alt="" width="72" height="72"><span>${n ? p.ko : '?'}</span>${n > 1 ? `<small>×${n}</small>` : ''}</button>`; }).join('')}</div>
-    <div id="stkInfo" class="note">모은 스티커를 누르면 설명이 나와요.</div>
+    <div class="row"><h2 style="font-size:24px">스티커 앨범</h2><span class="note" style="margin-left:auto">모두 ${stkCount()} / ${STK().length}장</span></div>
+    <div class="chips" role="tablist">${SETS().map((s) => { const on = open.includes(s.id);
+      return `<button class="chip" role="tab" data-set="${s.id}" aria-pressed="${s.id === setId}" ${on ? '' : 'disabled'}>${on ? '' : '잠김 · '}${esc(s.name)}</button>`; }).join('')}</div>
+    <p style="margin:0">${esc(set.name)} ${have} / ${items.length}장${have === items.length ? ' · <b>완성!</b>' : ''}</p>
+    <div class="stk-grid" style="--stk-bg:${set.color}">${items.map((st) => { const n = S.stickers[st.id] || 0;
+      return `<button class="stk ${n ? '' : 'none'} ${n >= SHINY_AT ? 'shiny' : ''}" data-id="${st.id}" aria-label="${n ? esc(st.ko) + ' 스티커 ' + n + '장' : '아직 못 모은 스티커'}">${stkImg(st, 72)}<span>${n ? esc(st.ko) : '?'}</span>${n > 1 ? `<small>×${n}</small>` : ''}</button>`; }).join('')}</div>
+    <div id="stkInfo" class="note">모은 스티커를 누르면 설명이 나와요. 같은 스티커를 ${SHINY_AT}장 모으면 반짝 스티커가 돼요!</div>
+    ${open.length < SETS().length ? `<p class="note" style="margin:0">'${esc(SETS()[open.length - 1].name)}' 앨범을 다 모으면 '${esc(SETS()[open.length].name)}' 앨범이 열려요.</p>` : ''}
     <div class="note"><b>스티커 받는 방법</b> (하루 ${STICKER_DAILY}장까지)<br>· 출석 도장 7일 연속<br>· 문제 10개 모두 맞히기<br>· 태양계 카드 순서 맞히기 한 번도 안 틀리기<br>· 연산 스피드 20개 이상 · 낱말 퍼즐 별 5개</div>
     <button class="btn block" id="back">돌아가기</button></div>`;
+  $('#view').querySelectorAll('[data-set]').forEach((b) => b.onclick = () => stickerView(b.dataset.set));
   $('#view').querySelectorAll('.stk').forEach((b) => b.onclick = () => {
-    const p = all.find((x) => x.id === b.dataset.id);
-    $('#stkInfo').innerHTML = S.stickers[p.id] ? `<b>${p.ko} (${p.en})</b> — ${esc(p.fact)}` : '아직 못 모은 스티커예요. 어떤 행성일까?';
+    const st = STK().find((x) => x.id === b.dataset.id), n = S.stickers[st.id] || 0;
+    $('#stkInfo').innerHTML = n ? `<b>${esc(st.ko)} (${esc(st.en)})</b> — ${esc(st.fact)}${n >= SHINY_AT ? ' ✨' : ` <span class="note">(반짝까지 ${SHINY_AT - n}장)</span>`}` : '아직 못 모은 스티커예요. 무엇일까?';
   });
   $('#back').onclick = home;
 }
@@ -497,7 +535,7 @@ function home(){
       <button class="btn" id="goWrong">오답노트 <span class="note">${S.wrong.length}</span></button>
       <button class="btn" id="goAI">AI 친구 척척이</button>
       <button class="btn" id="goLedger">내 통장 보기</button>
-      <button class="btn" id="goStk">우주 스티커 <span class="note">${window.GameData.PLANETS.filter((x) => S.stickers[x.id]).length}/9</span></button>
+      <button class="btn" id="goStk">스티커 앨범 <span class="note">${stkCount()}/${STK().length}</span></button>
     </div>
     <div class="grid2">
       <button class="btn ghost" id="goParent">부모님 메뉴</button>
@@ -518,7 +556,7 @@ function home(){
   $('#view').querySelectorAll('[data-subj]').forEach((b) => b.onclick = () => setup(b.dataset.subj));
   $('#goWrong').onclick = () => S.wrong.length ? startReview() : toast('틀린 문제가 없어요. 멋져요!');
   $('#goAI').onclick = () => aiChat(); $('#goLedger').onclick = ledger; $('#goParent').onclick = parentGate; $('#goPet').onclick = () => petView(); $('#goGame').onclick = gamesView;
-  $('#goStk').onclick = stickerView;
+  $('#goStk').onclick = () => stickerView();
   $('#sndBtn').onclick = () => { s.sound = !s.sound; save(); const b = $('#sndBtn'); b.textContent = '소리 ' + (s.sound ? '켜짐' : '꺼짐'); b.setAttribute('aria-pressed', s.sound); sfx('ok'); };
   if (reached) $('#goCert').onclick = cert;
 }
@@ -686,7 +724,7 @@ function finishRound(){
       <div class="eyebrow">${esc(r.name)} 결과</div>
       <div class="big-num num">${r.correct} / ${n}</div>
       <div class="disp" style="font-size:24px">${r.earned >= 0 ? '+' : ''}${won(r.earned)} 적립</div>
-      ${perfect ? `<p style="margin:0"><b>${stk ? `10문제 모두 정답! 우주 스티커 ${josa(stk.ko, '을', '를')} 받았어요` : '10문제 모두 정답! (오늘 스티커는 다 받았어요)'}</b></p>` : ''}
+      ${perfect ? `<p style="margin:0"><b>${stk ? `10문제 모두 정답! 스티커 ${josa(stk.ko, '을', '를')} 받았어요` : '10문제 모두 정답! (오늘 스티커는 다 받았어요)'}</b></p>` : ''}
       <p class="note">${n === 0 ? '다음에 또 도전해요!' : r.correct === n ? '모두 맞혔어요! 최고예요!' : r.correct / n >= 0.7 ? '잘했어요! 틀린 문제는 오답노트에 있어요.' : '괜찮아요. 오답노트로 한 번 더 풀어 봐요.'}</p>
       ${reached ? `<button class="btn coin block" id="goCert">목표 달성! 칭찬 카드 만들기</button>` : `<p class="note">목표까지 ${won(s.goal - S.balance)} 남았어요</p>`}
       <button class="btn primary block" id="again">처음으로</button>
@@ -853,7 +891,7 @@ function gameStart(){
 function gameEnd({ id, title, lines, amt = 0, label, again, sticker = false }){
   const g = GAMES.find((x) => x.id === id), s = S.settings, d = daily(); d.games = d.games || {};
   let msg = '';
-  if (sticker) { const p = grantSticker(); lines = lines.concat(p ? `우주 스티커 ${josa(p.ko, '을', '를')} 받았어요!` : '멋진 기록! (오늘 스티커는 다 받았어요)'); }
+  if (sticker) { const p = grantSticker(); lines = lines.concat(p ? `스티커 ${josa(p.ko, '을', '를')} 받았어요!` : '멋진 기록! (오늘 스티커는 다 받았어요)'); }
   if (g.paid) {
     if (gamesLeft(id) === 0) { msg = `오늘 ${g.name} 적립은 다 했어요. 기록 도전은 계속할 수 있어요!`; amt = 0; }
     else {
@@ -894,16 +932,17 @@ function planetPlay(lv){
   const picked = shuffle(GD.PLANETS.slice(1)).slice(0, pairs);
   const cards = shuffle(picked.flatMap((p) => [{ id:p.id, face:'img' }, { id:p.id, face:'name' }]));
   let open = [], done = 0, moves = 0, lock = false;
+  // 앞면은 처음부터 카드 안에 숨겨 둔다 → 그림을 미리 받아 두어 뒤집자마자 보인다
+  const face = (c) => { const p = GD.PLANETS.find((x) => x.id === c.id); return c.face === 'img' ? planetImg(c.id, 80) : esc(en ? p.en : p.ko); };
   $('#view').innerHTML = `<div class="card" style="display:flex;flex-direction:column;gap:10px">
     <div class="ghud"><span>짝 맞추기</span><span class="note" style="margin-left:auto" id="mv">0번 뒤집음</span></div>
-    <div class="mem" id="mem">${cards.map((c, i) => `<button class="mcard" data-i="${i}" aria-label="카드 ${i + 1}"><span class="back">★</span></button>`).join('')}</div>
+    <div class="mem" id="mem">${cards.map((c, i) => `<button class="mcard" data-i="${i}" aria-label="카드 ${i + 1}"><span class="back">★</span><span class="face">${face(c)}</span></button>`).join('')}</div>
     <button class="btn ghost block" id="quitG">그만하기</button></div>`;
   $('#quitG').onclick = gamesView;
-  const face = (c) => { const p = GD.PLANETS.find((x) => x.id === c.id); return c.face === 'img' ? planetImg(c.id, 80) : esc(en ? p.en : p.ko); };
   $('#mem').onclick = (e) => {
     const b = e.target.closest('.mcard'); if (!b || lock) return; const i = +b.dataset.i;
     if (b.classList.contains('open') || b.classList.contains('done')) return;
-    b.classList.add('open'); b.innerHTML = face(cards[i]); open.push(i); sfx('tap');
+    b.classList.add('open'); open.push(i); sfx('tap');
     if (open.length < 2) return;
     moves++; $('#mv').textContent = moves + '번 뒤집음';
     const [a, c] = open; open = [];
@@ -914,7 +953,7 @@ function planetPlay(lv){
       if (done === pairs) setTimeout(() => planetOrder(lv, moves), 900);
     } else {
       lock = true;
-      setTimeout(() => { [ea, ec].forEach((x) => { x.classList.remove('open'); x.innerHTML = '<span class="back">★</span>'; }); lock = false; }, 900);
+      setTimeout(() => { [ea, ec].forEach((x) => x.classList.remove('open')); lock = false; }, 1000);
     }
   };
 }
