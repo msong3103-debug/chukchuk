@@ -1,0 +1,586 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="icon.svg">
+<link rel="apple-touch-icon" href="icon.svg">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>척척 용돈통장</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1f6f5c">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap">
+<style>
+:root{
+  --bg:#e7f3ee; --panel:#ffffff; --panel2:#f3faf7; --ink:#18352f; --muted:#5b7870; --line:#cfe3db;
+  --brand:#1f6f5c; --brand-ink:#ffffff; --coin:#f2b632; --coin-ink:#5a3d00;
+  --ok:#2a9d63; --ok-bg:#e2f6ea; --bad:#d9534a; --bad-bg:#fde8e6; --lock:#9fb3ac;
+  --math:#3d7be0; --kor:#e0673d; --int:#2a9d63; --soc:#8a5fd0; --sci:#0f9bb0; --eng:#d04f8a; --mor:#b08a1f;
+  --radius:18px; --shadow:0 2px 0 rgba(24,53,47,.12);
+  --display:"Jua","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --body:"Gowun Dodum","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  color-scheme:dark; --bg:#0f1d1a; --panel:#172a26; --panel2:#1d332e; --ink:#e3f2ec; --muted:#9ab8ae; --line:#2b4640;
+  --brand:#3fae90; --brand-ink:#08201a; --coin:#f5c451; --coin-ink:#3a2800;
+  --ok:#4cc987; --ok-bg:#163a28; --bad:#f07b72; --bad-bg:#3d1f1d; --lock:#50665f; --shadow:0 2px 0 rgba(0,0,0,.35);
+}}
+:root[data-theme="dark"]{
+  color-scheme:dark; --bg:#0f1d1a; --panel:#172a26; --panel2:#1d332e; --ink:#e3f2ec; --muted:#9ab8ae; --line:#2b4640;
+  --brand:#3fae90; --brand-ink:#08201a; --coin:#f5c451; --coin-ink:#3a2800;
+  --ok:#4cc987; --ok-bg:#163a28; --bad:#f07b72; --bad-bg:#3d1f1d; --lock:#50665f; --shadow:0 2px 0 rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+html,body{background:var(--bg)}
+body{color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.55;padding-inline:16px;padding-block:0 32px}
+.wrap{max-width:520px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+button:focus-visible,input:focus-visible{outline:3px solid var(--coin);outline-offset:2px}
+h1,h2,h3,.disp{font-family:var(--display);font-weight:400;margin:0;text-wrap:balance}
+.num{font-variant-numeric:tabular-nums}
+
+/* 통장 헤더 */
+.book{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;margin-inline:-16px;padding:12px 16px 10px;background:var(--brand);color:var(--brand-ink)}
+.book-in{max-width:520px;margin:0 auto;display:flex;align-items:center;gap:12px}
+.book .who{font-family:var(--display);font-size:18px;line-height:1.2}
+.book .who small{display:block;font-family:var(--body);font-size:12px;opacity:.85}
+.book .bal{margin-left:auto;text-align:right}
+.book .bal small{display:block;font-size:12px;opacity:.85}
+.book .bal b{font-family:var(--display);font-weight:400;font-size:26px;letter-spacing:.5px}
+.goal{max-width:520px;margin:8px auto 0;height:10px;border-radius:99px;background:rgba(255,255,255,.25);overflow:hidden}
+.goal i{display:block;height:100%;background:var(--coin);border-radius:99px;transition:width .5s}
+.goal-lab{max-width:520px;margin:4px auto 0;font-size:12px;opacity:.9;display:flex;justify-content:space-between}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px}
+.eyebrow{font-size:13px;letter-spacing:.06em;color:var(--muted)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:48px;padding:10px 18px;border-radius:14px;background:var(--panel2);border:1px solid var(--line);font-family:var(--display);font-size:18px;box-shadow:var(--shadow)}
+.btn:active{transform:translateY(1px);box-shadow:none}
+.btn.primary{background:var(--brand);color:var(--brand-ink);border-color:transparent}
+.btn.coin{background:var(--coin);color:var(--coin-ink);border-color:transparent}
+.btn.ghost{background:transparent;box-shadow:none}
+.btn.danger{background:var(--bad);color:#fff;border-color:transparent}
+.btn.block{width:100%}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+
+/* 과목 */
+.subj{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.sbtn{position:relative;text-align:left;padding:14px;border-radius:var(--radius);background:var(--panel);border:1px solid var(--line);border-left:8px solid var(--c);box-shadow:var(--shadow);min-height:86px;display:flex;flex-direction:column;gap:2px}
+.sbtn .disp{font-size:22px;color:var(--c)}
+.sbtn small{color:var(--muted);font-size:13px;word-break:keep-all}
+.sbtn.locked{--c:var(--lock)!important;cursor:default;box-shadow:none;opacity:.8}
+.cta-reward{display:flex;align-items:center;gap:12px;padding:16px;border-radius:var(--radius);background:var(--coin);color:var(--coin-ink);box-shadow:var(--shadow);text-align:left;width:100%}
+.cta-reward .disp{font-size:21px}
+
+/* 설정(단원/난이도) */
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{padding:8px 14px;border-radius:99px;border:2px solid var(--line);background:var(--panel2);font-size:15px}
+.chip[aria-pressed="true"]{border-color:var(--brand);background:var(--brand);color:var(--brand-ink)}
+.diffs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.diff{padding:12px 6px;border-radius:14px;border:2px solid var(--line);background:var(--panel2);text-align:center}
+.diff .disp{display:block;font-size:20px}
+.diff small{color:var(--muted)}
+.diff[aria-pressed="true"]{border-color:var(--coin);background:var(--coin);color:var(--coin-ink)}
+.diff[aria-pressed="true"] small{color:var(--coin-ink)}
+.stars{letter-spacing:2px}
+
+/* 문제 */
+.qhead{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted)}
+.qhead .combo{margin-left:auto;font-family:var(--display);color:var(--kor);font-size:17px}
+.bar{height:8px;border-radius:99px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--brand);transition:width .3s}
+.qtext{font-family:var(--display);font-size:24px;line-height:1.45;white-space:pre-line;word-break:keep-all}
+.passage{background:var(--panel2);border:1px dashed var(--line);border-radius:12px;padding:12px 14px;white-space:pre-line;font-size:17px}
+.qvis{display:flex;flex-direction:column;align-items:center;gap:6px;overflow-x:auto}
+.clock-legend{font-size:13px;display:flex;gap:10px}
+.qtable{border-collapse:collapse;font-size:16px;text-align:center;background:var(--panel)}
+.qtable caption{font-size:14px;color:var(--muted);padding-bottom:4px}
+.qtable th,.qtable td{border:1px solid var(--line);padding:6px 9px}
+.qtable th{background:var(--panel2);font-weight:400}
+.qgraph{width:100%;max-width:340px;border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+.gcap{font-size:14px;color:var(--muted);text-align:center;margin-bottom:4px}
+.grow{display:flex;gap:10px;align-items:center;border-top:1px solid var(--line);padding:4px 0}
+.glab{width:64px;flex:none}
+.gdots{letter-spacing:3px;color:var(--brand);font-size:18px}
+.groups{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.grp{border:2px dashed var(--line);border-radius:12px;padding:4px 6px;font-size:22px}
+.choices{display:grid;gap:10px}
+.choice{width:100%;text-align:left;padding:14px 16px;border-radius:14px;background:var(--panel);border:2px solid var(--line);font-size:19px;box-shadow:var(--shadow);word-break:keep-all}
+.choice.big{text-align:center;font-family:var(--display);font-size:28px}
+.choice.ok{border-color:var(--ok);background:var(--ok-bg)}
+.choice.no{border-color:var(--bad);background:var(--bad-bg)}
+.choice.off{opacity:.35;text-decoration:line-through}
+.choice[disabled]{cursor:default}
+.ansbox{min-height:64px;border-radius:14px;border:3px solid var(--brand);background:var(--panel);display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:34px;letter-spacing:2px}
+.ansbox.empty{color:var(--muted);font-size:18px;letter-spacing:0}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.pad button{min-height:56px;border-radius:14px;background:var(--panel);border:1px solid var(--line);font-family:var(--display);font-size:26px;box-shadow:var(--shadow)}
+.pad button.go{background:var(--brand);color:var(--brand-ink);font-size:20px}
+.feedback{border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:4px}
+.feedback.ok{background:var(--ok-bg);border:2px solid var(--ok)}
+.feedback.no{background:var(--bad-bg);border:2px solid var(--bad)}
+.feedback .disp{font-size:22px}
+.hintbox{border-radius:14px;padding:12px 14px;background:var(--panel2);border:2px dashed var(--coin);font-size:16px}
+.pop{position:fixed;left:50%;top:40%;transform:translate(-50%,0);font-family:var(--display);font-size:40px;color:var(--coin);text-shadow:0 2px 0 var(--coin-ink);pointer-events:none;animation:pop 1s ease-out forwards;z-index:30}
+@keyframes pop{0%{opacity:0;transform:translate(-50%,20px) scale(.8)}20%{opacity:1;transform:translate(-50%,0) scale(1.1)}100%{opacity:0;transform:translate(-50%,-60px) scale(1)}}
+@media (prefers-reduced-motion:reduce){.pop{animation:none;opacity:0}.goal i,.bar i{transition:none}}
+
+/* 통장 거래내역 */
+.ledger{width:100%;border-collapse:collapse;font-size:14px}
+.ledger th{font-weight:400;color:var(--muted);text-align:right;border-bottom:2px solid var(--brand);padding:6px 4px}
+.ledger th:first-child,.ledger td:first-child,.ledger th:nth-child(2),.ledger td:nth-child(2){text-align:left}
+.ledger td{border-bottom:1px dashed var(--line);padding:7px 4px;text-align:right;vertical-align:top}
+.ledger .in{color:var(--ok)} .ledger .out{color:var(--bad)}
+.tscroll{overflow-x:auto}
+
+/* 채팅 */
+.chat{display:flex;flex-direction:column;gap:10px;min-height:260px}
+.msg{max-width:85%;padding:10px 14px;border-radius:16px;white-space:pre-wrap;word-break:keep-all}
+.msg.me{align-self:flex-end;background:var(--brand);color:var(--brand-ink);border-bottom-right-radius:4px}
+.msg.ai{align-self:flex-start;background:var(--panel2);border:1px solid var(--line);border-bottom-left-radius:4px}
+.inrow{display:flex;gap:8px}
+.inrow input{flex:1;min-width:0;min-height:48px;border-radius:14px;border:2px solid var(--line);background:var(--panel);color:var(--ink);padding:0 14px;font:inherit}
+
+/* 부모 */
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:14px;color:var(--muted)}
+.field input,.field select{min-height:44px;border-radius:12px;border:2px solid var(--line);background:var(--panel);color:var(--ink);padding:0 12px;font:inherit;width:100%}
+.pinshow{display:flex;justify-content:center;gap:12px;font-size:30px;letter-spacing:4px;font-family:var(--display)}
+.note{font-size:14px;color:var(--muted)}
+.cert-img{width:100%;border-radius:16px;border:1px solid var(--line)}
+.center{text-align:center}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:99px;font-size:15px;z-index:40;max-width:calc(100% - 32px)}
+.big-num{font-family:var(--display);font-size:44px;color:var(--brand)}
+hr{border:0;border-top:1px dashed var(--line);margin:4px 0}
+</style>
+
+<div class="book" id="book"></div>
+<div class="wrap" id="view" style="margin-top:14px"></div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="math-gen.js"></script>
+<script src="bank-g2.js"></script>
+<script>
+(function(){
+'use strict';
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const won = (n) => n.toLocaleString('ko-KR') + '원';
+const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+const shuffle = (a) => { a = a.slice(); for (let i = a.length-1; i > 0; i--) { const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]] = [a[j],a[i]]; } return a; };
+const DIFF_NAME = {1:'쉬움',2:'보통',3:'어려움'};
+const STARS = {1:'★',2:'★★',3:'★★★'};
+
+const SUBJECTS = [
+  {id:'math', name:'수학', c:'var(--math)', grades:[2,3,4]},
+  {id:'kor',  name:'국어', c:'var(--kor)',  grades:[2,3,4]},
+  {id:'int',  name:'통합교과', c:'var(--int)', grades:[2], sub:'마을 · 세계 · 안전'},
+  {id:'soc',  name:'사회', c:'var(--soc)', grades:[3,4]},
+  {id:'sci',  name:'과학', c:'var(--sci)', grades:[3,4]},
+  {id:'eng',  name:'영어', c:'var(--eng)', grades:[3,4]},
+  {id:'mor',  name:'도덕', c:'var(--mor)', grades:[3,4]},
+];
+
+// ───── 저장 ─────
+const KEY = 'chukchuk-bank-v1';
+const DEF_SETTINGS = { name:'우리 딸', grade:2, sem:2, review:true, reward:{1:10,2:30,3:50}, comboBonus:50, penalty:0, dailyCap:1000, goal:5000, pin:'0000', aiUrl:'', aiToken:'', aiDaily:20 };
+let S;
+function load(){
+  let raw = null; try { raw = JSON.parse(localStorage.getItem(KEY)); } catch(e) {}
+  S = Object.assign({ balance:0, ledger:[], wrong:[], stats:{solved:0,correct:0,bestCombo:0}, daily:{date:'',earned:0,ai:0}, seen:{} }, raw || {});
+  S.settings = Object.assign({}, DEF_SETTINGS, S.settings || {});
+  S.settings.reward = Object.assign({}, DEF_SETTINGS.reward, S.settings.reward || {});
+  if (!raw) S.ledger.push({ t:Date.now(), memo:'통장 만들기', in:0, out:0, bal:0 });
+}
+function save(){ try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e) {} }
+function daily(){ if (S.daily.date !== today()) S.daily = { date:today(), earned:0, ai:0 }; return S.daily; }
+function addLedger(memo, amt){ S.ledger.push({ t:Date.now(), memo, in:amt>0?amt:0, out:amt<0?-amt:0, bal:S.balance }); if (S.ledger.length > 300) S.ledger = S.ledger.slice(-300); }
+
+function toast(msg){ const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => t.hidden = true, 2200); }
+function popCoin(text){ const d = document.createElement('div'); d.className = 'pop'; d.textContent = text; document.body.appendChild(d); setTimeout(() => d.remove(), 1100); }
+
+// ───── 헤더(통장) ─────
+function renderBook(){
+  const s = S.settings; const pct = Math.min(100, Math.round(S.balance / s.goal * 100));
+  $('#book').innerHTML = `<div class="book-in"><div class="who">${esc(s.name)}의 척척 통장<small>${s.grade}학년 ${s.sem}학기</small></div>
+    <div class="bal"><small>잔액</small><b class="num">${won(S.balance)}</b></div></div>
+    <div class="goal" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>
+    <div class="goal-lab"><span>목표 ${won(s.goal)}</span><span>${S.balance >= s.goal ? '목표 달성!' : '앞으로 ' + won(s.goal - S.balance)}</span></div>`;
+}
+
+// ───── 문제 공급 ─────
+function mathUnits(){
+  const s = S.settings, M = window.MathGen.MATH_UNITS;
+  let list = (M[`g${s.grade}s${s.sem}`] || []).slice();
+  if (s.review && s.sem === 2) list = list.concat(M[`g${s.grade}s1`] || []);
+  if (s.review && s.sem === 1 && s.grade > 2) list = list.concat(M[`g${s.grade-1}s2`] || []);
+  return list;
+}
+function bankFor(subj){ const g = (window.QBANK || {})['g' + S.settings.grade]; return (g && g[subj]) || []; }
+function unitsFor(subj){
+  if (subj === 'math') return mathUnits().map((u) => ({ id:u.id, name:u.name }));
+  return [...new Set(bankFor(subj).map((q) => q.unit))].map((u) => ({ id:u, name:u }));
+}
+function normBank(b){
+  const choices = shuffle([b.ans, ...b.wrong]);
+  return { subject:b.subject, unit:b.unit, diff:b.diff, q:b.q, passage:b.passage, type:'mc', choices, answer:choices.indexOf(b.ans), explain:b.explain, key:b.subject + '|' + b.q };
+}
+function buildRound(subj, unitIds, diff){
+  const out = [];
+  if (subj === 'math') {
+    const units = mathUnits().filter((u) => unitIds.includes(u.id)); const keys = new Set();
+    for (let tries = 0; out.length < 10 && tries < 80; tries++) {
+      const q = window.MathGen.genMath(units[Math.floor(Math.random()*units.length)], diff);
+      if (keys.has(q.key)) continue; keys.add(q.key); out.push(q);
+    }
+    return out;
+  }
+  const pool = bankFor(subj).filter((q) => unitIds.includes(q.unit));
+  const rank = (q) => (S.seen[q.subject + '|' + q.q] || 0) + Math.random();
+  const exact = pool.filter((q) => q.diff === diff).sort((a,b) => rank(a) - rank(b));
+  const near = pool.filter((q) => q.diff !== diff).sort((a,b) => Math.abs(a.diff-diff) - Math.abs(b.diff-diff) || rank(a) - rank(b));
+  return exact.concat(near).slice(0, 10).map(normBank);
+}
+
+// ───── 화면: 홈 ─────
+let R = null; // 진행 중 라운드
+function home(){
+  R = null; renderBook();
+  const s = S.settings, d = daily();
+  const subjHtml = SUBJECTS.map((sb) => {
+    const ok = sb.grades.includes(s.grade);
+    const has = ok && unitsFor(sb.id).length > 0;
+    if (!ok && s.grade > Math.max(...sb.grades)) return '';
+    const sub = !ok ? `${Math.min(...sb.grades)}학년부터 열려요` : has ? (sb.sub || unitsFor(sb.id).map((u) => u.name.replace(' (복습)','')).slice(0,3).join(' · ')) : '문제 준비 중';
+    return `<button class="sbtn ${has ? '' : 'locked'}" style="--c:${sb.c}" ${has ? `data-subj="${sb.id}"` : 'aria-disabled="true"'}><span class="disp">${sb.name}</span><small>${esc(sub)}</small></button>`;
+  }).join('');
+  const reached = S.balance >= s.goal;
+  $('#view').innerHTML = `
+    ${reached ? `<button class="cta-reward" id="goCert"><span class="disp" style="font-size:34px">★</span><span><span class="disp">용돈 받을 준비 완료!</span><br><small>칭찬 카드를 만들어 엄마·아빠께 보내요</small></span></button>` : ''}
+    <div class="card" style="display:flex;flex-direction:column;gap:12px">
+      <div class="row"><h2 style="font-size:24px">오늘은 뭘 풀어 볼까?</h2><span class="note" style="margin-left:auto">오늘 ${won(d.earned)} / ${won(s.dailyCap)}</span></div>
+      <div class="subj">${subjHtml}</div>
+    </div>
+    <div class="grid2">
+      <button class="btn" id="goWrong">오답노트 <span class="note">${S.wrong.length}</span></button>
+      <button class="btn" id="goAI">AI 친구 척척이</button>
+      <button class="btn" id="goLedger">내 통장 보기</button>
+      <button class="btn ghost" id="goParent">부모님 메뉴</button>
+    </div>
+    <p class="note center">푼 문제 ${S.stats.solved}개 · 정답률 ${S.stats.solved ? Math.round(S.stats.correct / S.stats.solved * 100) : 0}% · 최고 콤보 ${S.stats.bestCombo}</p>`;
+  $('#view').querySelectorAll('[data-subj]').forEach((b) => b.onclick = () => setup(b.dataset.subj));
+  $('#goWrong').onclick = () => S.wrong.length ? startReview() : toast('틀린 문제가 없어요. 멋져요!');
+  $('#goAI').onclick = aiChat; $('#goLedger').onclick = ledger; $('#goParent').onclick = parentGate;
+  if (reached) $('#goCert').onclick = cert;
+}
+
+// ───── 단원·난이도 고르기 ─────
+function setup(subj){
+  const sb = SUBJECTS.find((x) => x.id === subj); const units = unitsFor(subj); const rw = S.settings.reward;
+  let sel = new Set(units.map((u) => u.id)), diff = 1;
+  $('#view').innerHTML = `
+    <div class="card" style="display:flex;flex-direction:column;gap:14px">
+      <div class="eyebrow">${S.settings.grade}학년 ${S.settings.sem}학기</div>
+      <h2 style="font-size:28px;color:${sb.c}">${sb.name}</h2>
+      <div><div class="note" style="margin-bottom:6px">단원 고르기</div><div class="chips" id="chips">${units.map((u) => `<button class="chip" aria-pressed="true" data-u="${esc(u.id)}">${esc(u.name)}</button>`).join('')}</div></div>
+      <div><div class="note" style="margin-bottom:6px">난이도 (맞히면 받는 돈)</div>
+        <div class="diffs" id="diffs">${[1,2,3].map((d) => `<button class="diff" data-d="${d}" aria-pressed="${d===1}"><span class="stars">${STARS[d]}</span><span class="disp">${DIFF_NAME[d]}</span><small class="num">${won(rw[d])}</small></button>`).join('')}</div></div>
+      <button class="btn primary block" id="start">10문제 시작!</button>
+      <button class="btn ghost block" id="back">돌아가기</button>
+    </div>`;
+  $('#chips').onclick = (e) => { const b = e.target.closest('.chip'); if (!b) return; const id = b.dataset.u; if (sel.has(id) && sel.size === 1) return toast('단원을 하나는 골라야 해요'); sel.has(id) ? sel.delete(id) : sel.add(id); b.setAttribute('aria-pressed', sel.has(id)); };
+  $('#diffs').onclick = (e) => { const b = e.target.closest('.diff'); if (!b) return; diff = +b.dataset.d; $('#diffs').querySelectorAll('.diff').forEach((x) => x.setAttribute('aria-pressed', x === b)); };
+  $('#start').onclick = () => { const list = buildRound(subj, [...sel], diff); if (!list.length) return toast('이 단원은 문제가 아직 없어요'); R = { subj, name:sb.name, list, i:0, correct:0, earned:0, combo:0, review:false }; showQ(); };
+  $('#back').onclick = home;
+}
+function startReview(){
+  const list = shuffle(S.wrong).slice(0, 10).map((q) => q.type === 'mc' && q.subject !== 'math' ? Object.assign({}, q, (() => { const ans = q.choices[q.answer]; const ch = shuffle(q.choices); return { choices:ch, answer:ch.indexOf(ans) }; })()) : q);
+  R = { subj:'review', name:'오답노트', list, i:0, correct:0, earned:0, combo:0, review:true }; showQ();
+}
+
+// ───── 문제 화면 ─────
+function showQ(){
+  const q = R.list[R.i]; R.done = false; R.hint = false; R.input = '';
+  const rw = S.settings.reward[q.diff] * (R.review ? 0.5 : 1);
+  $('#view').innerHTML = `
+    <div class="card" style="display:flex;flex-direction:column;gap:12px">
+      <div class="qhead"><span>${esc(R.name)} · ${esc(q.unit)}</span><span class="stars" title="${DIFF_NAME[q.diff]}">${STARS[q.diff]}</span><span class="combo">${R.combo >= 2 ? R.combo + ' 콤보!' : ''}</span></div>
+      <div class="bar"><i style="width:${R.i / R.list.length * 100}%"></i></div>
+      <div class="note num">${R.i + 1} / ${R.list.length} · 맞히면 ${won(Math.floor(rw))}</div>
+      ${q.passage ? `<div class="passage">${esc(q.passage)}</div>` : ''}
+      <div class="qtext">${esc(q.q)}</div>
+      ${q.html ? `<div class="qvis">${q.html}</div>` : ''}
+      <div id="answerArea"></div>
+      <div id="hintArea"></div>
+      <div id="fb"></div>
+      <div class="row" id="qtools"><button class="btn" id="hintBtn">힌트 보기 <span class="note">(적립 절반)</span></button><button class="btn ghost" id="quit" style="margin-left:auto">그만하기</button></div>
+    </div>`;
+  const area = $('#answerArea');
+  if (q.type === 'mc') {
+    const big = q.choices.every((c) => String(c).length <= 3);
+    area.innerHTML = `<div class="choices" style="${big ? 'grid-template-columns:repeat(' + Math.min(q.choices.length, 4) + ',1fr)' : ''}">${q.choices.map((c, i) => `<button class="choice ${big ? 'big' : ''}" data-i="${i}">${esc(c)}</button>`).join('')}</div>`;
+    area.querySelectorAll('.choice').forEach((b) => b.onclick = () => answer(+b.dataset.i));
+  } else {
+    area.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px"><div class="ansbox empty num" id="ansbox">숫자를 눌러요</div>
+      <div class="pad">${[1,2,3,4,5,6,7,8,9].map((n) => `<button data-k="${n}">${n}</button>`).join('')}<button data-k="del" aria-label="지우기">⌫</button><button data-k="0">0</button><button data-k="ok" class="go">확인</button></div></div>`;
+    area.querySelector('.pad').onclick = (e) => { const b = e.target.closest('button'); if (b) key(b.dataset.k); };
+  }
+  $('#hintBtn').onclick = hint; $('#quit').onclick = finishRound;
+}
+function key(k){
+  if (R.done) return;
+  if (k === 'ok') { if (R.input === '') return toast('답을 먼저 눌러요'); return answer(parseInt(R.input, 10)); }
+  if (k === 'del') R.input = R.input.slice(0, -1); else if (R.input.length < 6) R.input = (R.input === '0' ? '' : R.input) + k;
+  const box = $('#ansbox'); box.textContent = R.input || '숫자를 눌러요'; box.classList.toggle('empty', !R.input);
+}
+document.addEventListener('keydown', (e) => {
+  if (!R || R.done || !R.list[R.i] || R.list[R.i].type !== 'num' || !$('#ansbox')) return;
+  if (/^[0-9]$/.test(e.key)) key(e.key); else if (e.key === 'Backspace') key('del'); else if (e.key === 'Enter') key('ok');
+});
+
+function answer(val){
+  if (R.done) return; R.done = true;
+  const q = R.list[R.i], s = S.settings, d = daily();
+  const correct = q.type === 'mc' ? val === q.answer : val === q.answer;
+  S.stats.solved++;
+  S.seen[q.key] = (S.seen[q.key] || 0) + 1;
+  let gain = 0, bonusMsg = '';
+  if (correct) {
+    S.stats.correct++; R.correct++; R.combo++; S.stats.bestCombo = Math.max(S.stats.bestCombo, R.combo);
+    gain = s.reward[q.diff]; if (R.review) gain = Math.floor(gain / 2); if (R.hint) gain = Math.floor(gain / 2);
+    if (!R.review && R.combo % 5 === 0) { gain += s.comboBonus; bonusMsg = `${R.combo}콤보 보너스 +${won(s.comboBonus)}!`; }
+    const room = Math.max(0, s.dailyCap - d.earned);
+    if (gain > room) { gain = room; bonusMsg = '오늘 모을 수 있는 돈을 다 모았어요. 문제는 계속 풀 수 있어요!'; }
+    S.balance += gain; d.earned += gain; R.earned += gain;
+    if (R.review) S.wrong = S.wrong.filter((w) => w.key !== q.key);
+    if (gain > 0) popCoin('+' + won(gain));
+  } else {
+    R.combo = 0;
+    const loss = Math.min(s.penalty, S.balance);
+    if (loss > 0) { S.balance -= loss; R.earned -= loss; }
+    if (!S.wrong.some((w) => w.key === q.key)) { const copy = Object.assign({}, q); S.wrong.push(copy); if (S.wrong.length > 60) S.wrong.shift(); }
+    gain = -loss;
+  }
+  save(); renderBook();
+  // 표시
+  if (q.type === 'mc') $('#answerArea').querySelectorAll('.choice').forEach((b) => { b.disabled = true; const i = +b.dataset.i; if (i === q.answer) b.classList.add('ok'); else if (i === val) b.classList.add('no'); });
+  else { const box = $('#ansbox'); box.style.borderColor = correct ? 'var(--ok)' : 'var(--bad)'; }
+  const right = q.type === 'mc' ? q.choices[q.answer] : q.answer;
+  $('#fb').innerHTML = `<div class="feedback ${correct ? 'ok' : 'no'}">
+      <span class="disp">${correct ? pick(['정답이에요!','척척 맞혔어요!','와, 대단해요!','딩동댕!']) : '아쉬워요! 정답은 ' + esc(right)}</span>
+      <span>${esc(q.explain || '')}</span>
+      ${bonusMsg ? `<b>${esc(bonusMsg)}</b>` : ''}
+      ${!correct && gain < 0 ? `<span class="note">${won(-gain)}이 빠졌어요</span>` : ''}
+    </div>`;
+  $('#qtools').innerHTML = `<button class="btn primary block" id="next">${R.i + 1 < R.list.length ? '다음 문제' : '결과 보기'}</button>`;
+  $('#next').onclick = () => { R.i++; R.i < R.list.length ? showQ() : finishRound(); };
+  $('#next').focus();
+}
+const pick = (a) => a[Math.floor(Math.random() * a.length)];
+
+async function hint(){
+  if (R.done || R.hint) return;
+  const q = R.list[R.i]; R.hint = true; const btn = $('#hintBtn'); btn.disabled = true;
+  const box = $('#hintArea');
+  const s = S.settings, d = daily();
+  if (s.aiUrl && d.ai < s.aiDaily) {
+    box.innerHTML = `<div class="hintbox">척척이가 생각하는 중…</div>`;
+    try {
+      const text = await askAI({ mode:'hint', grade:s.grade, question:{ subject:R.name, unit:q.unit, text:q.q, passage:q.passage || '', choices:q.type === 'mc' ? q.choices : null, answer:q.type === 'mc' ? q.choices[q.answer] : q.answer } });
+      d.ai++; save(); box.innerHTML = `<div class="hintbox"><b>척척이 힌트</b><br>${esc(text)}</div>`; return;
+    } catch (e) { /* 아래 기본 힌트로 */ }
+  }
+  if (q.type === 'mc' && q.choices.length > 2) {
+    const wrongs = shuffle(q.choices.map((_, i) => i).filter((i) => i !== q.answer)).slice(0, q.choices.length > 3 ? 2 : 1);
+    wrongs.forEach((i) => { const b = $(`.choice[data-i="${i}"]`); b.classList.add('off'); b.disabled = true; });
+    box.innerHTML = `<div class="hintbox">틀린 답 ${wrongs.length}개를 지웠어요. 남은 것 중에서 골라 봐요!</div>`;
+  } else {
+    box.innerHTML = `<div class="hintbox">문제를 소리 내어 천천히 다시 읽어 봐요. 식을 세우거나 그림을 그려 보면 쉬워져요!</div>`;
+  }
+}
+
+function finishRound(){
+  if (!R) return home();
+  const n = Math.min(R.list.length, R.done && R.i < R.list.length ? R.i + 1 : R.i);
+  if (n > 0 || R.earned !== 0) { addLedger(`${R.name} ${n}문제 중 ${R.correct}개 정답`, R.earned); save(); }
+  const s = S.settings; const reached = S.balance >= s.goal; const r = R;
+  R = null; renderBook();
+  $('#view').innerHTML = `
+    <div class="card center" style="display:flex;flex-direction:column;gap:10px;align-items:center">
+      <div class="eyebrow">${esc(r.name)} 결과</div>
+      <div class="big-num num">${r.correct} / ${n}</div>
+      <div class="disp" style="font-size:24px">${r.earned >= 0 ? '+' : ''}${won(r.earned)} 적립</div>
+      <p class="note">${n === 0 ? '다음에 또 도전해요!' : r.correct === n ? '모두 맞혔어요! 최고예요!' : r.correct / n >= 0.7 ? '잘했어요! 틀린 문제는 오답노트에 있어요.' : '괜찮아요. 오답노트로 한 번 더 풀어 봐요.'}</p>
+      ${reached ? `<button class="btn coin block" id="goCert">목표 달성! 칭찬 카드 만들기</button>` : `<p class="note">목표까지 ${won(s.goal - S.balance)} 남았어요</p>`}
+      <button class="btn primary block" id="again">처음으로</button>
+    </div>`;
+  $('#again').onclick = home; if (reached) $('#goCert').onclick = cert;
+}
+
+// ───── 통장 ─────
+function ledger(){
+  const rows = S.ledger.slice().reverse().slice(0, 80).map((e) => { const d = new Date(e.t); return `<tr><td class="num">${d.getMonth()+1}.${String(d.getDate()).padStart(2,'0')}</td><td>${esc(e.memo)}</td><td class="in num">${e.in ? won(e.in) : ''}</td><td class="out num">${e.out ? won(e.out) : ''}</td><td class="num">${won(e.bal)}</td></tr>`; }).join('');
+  $('#view').innerHTML = `<div class="card" style="display:flex;flex-direction:column;gap:10px">
+    <h2 style="font-size:24px">거래내역</h2>
+    <div class="tscroll"><table class="ledger"><thead><tr><th>날짜</th><th>내용</th><th>들어온 돈</th><th>나간 돈</th><th>잔액</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <button class="btn block" id="back">돌아가기</button></div>`;
+  $('#back').onclick = home;
+}
+
+// ───── 칭찬 카드(인증) ─────
+function code(){ const s = `${S.settings.pin}|${S.balance}|${S.stats.solved}|${today()}`; let h = 5381; for (const ch of s) h = ((h << 5) + h + ch.charCodeAt(0)) >>> 0; return h.toString(36).toUpperCase().slice(-4).padStart(4, 'X'); }
+async function drawCert(){
+  try { await document.fonts.load('40px Jua'); await document.fonts.load('20px "Gowun Dodum"'); } catch(e) {}
+  const W = 1080, H = 1350, c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d');
+  const s = S.settings;
+  x.fillStyle = '#e7f3ee'; x.fillRect(0, 0, W, H);
+  x.fillStyle = '#1f6f5c'; roundRect(x, 60, 60, W - 120, H - 120, 48); x.fill();
+  x.fillStyle = '#ffffff'; roundRect(x, 100, 300, W - 200, 820, 36); x.fill();
+  x.fillStyle = '#f2b632'; x.beginPath(); x.arc(W / 2, 262, 92, 0, Math.PI * 2); x.fill();
+  x.fillStyle = '#5a3d00'; x.font = '104px Jua, sans-serif'; x.textAlign = 'center'; x.fillText('₩', W / 2, 302);
+  x.fillStyle = '#ffffff'; x.font = '54px Jua, sans-serif'; x.fillText('척척 용돈통장', W / 2, 138);
+  x.fillStyle = '#18352f'; x.font = '64px Jua, sans-serif'; x.fillText(`${s.name}의 목표 달성!`, W / 2, 440);
+  x.font = '38px "Gowun Dodum", sans-serif'; x.fillStyle = '#5b7870'; x.fillText('공부해서 모은 용돈', W / 2, 530);
+  x.font = '140px Jua, sans-serif'; x.fillStyle = '#1f6f5c'; x.fillText(won(S.balance), W / 2, 680);
+  x.strokeStyle = '#cfe3db'; x.setLineDash([12, 10]); x.lineWidth = 3; x.beginPath(); x.moveTo(160, 740); x.lineTo(W - 160, 740); x.stroke(); x.setLineDash([]);
+  const acc = S.stats.solved ? Math.round(S.stats.correct / S.stats.solved * 100) : 0;
+  x.font = '40px "Gowun Dodum", sans-serif'; x.fillStyle = '#18352f';
+  x.fillText(`푼 문제 ${S.stats.solved}개 · 정답률 ${acc}%`, W / 2, 820);
+  x.fillText(`최고 콤보 ${S.stats.bestCombo} · ${today()}`, W / 2, 890);
+  x.font = '46px Jua, sans-serif'; x.fillStyle = '#e0673d'; x.fillText('엄마 아빠, 칭찬해 주세요!', W / 2, 1000);
+  x.font = '34px "Gowun Dodum", sans-serif'; x.fillStyle = '#5b7870'; x.fillText(`확인코드 ${code()}`, W / 2, 1075);
+  x.font = '32px "Gowun Dodum", sans-serif'; x.fillStyle = '#ffffff'; x.fillText('부모님 메뉴에서 확인코드를 비교할 수 있어요', W / 2, 1210);
+  return c;
+}
+function roundRect(x, X, Y, w, h, r){ x.beginPath(); x.moveTo(X + r, Y); x.arcTo(X + w, Y, X + w, Y + h, r); x.arcTo(X + w, Y + h, X, Y + h, r); x.arcTo(X, Y + h, X, Y, r); x.arcTo(X, Y, X + w, Y, r); x.closePath(); }
+async function cert(){
+  $('#view').innerHTML = `<div class="card center"><p>카드를 만드는 중…</p></div>`;
+  const c = await drawCert(); const url = c.toDataURL('image/png');
+  $('#view').innerHTML = `<div class="card" style="display:flex;flex-direction:column;gap:12px">
+    <img class="cert-img" src="${url}" alt="${esc(S.settings.name)}의 목표 달성 칭찬 카드, 잔액 ${won(S.balance)}">
+    <button class="btn coin block" id="share">카톡·문자로 보내기</button>
+    <p class="note center" id="shareNote">버튼이 안 되면 이 화면을 캡처해서 엄마·아빠께 카톡으로 보내요.</p>
+    <button class="btn block" id="back">처음으로</button></div>`;
+  $('#back').onclick = home;
+  $('#share').onclick = async () => {
+    try {
+      const blob = await new Promise((r) => c.toBlob(r, 'image/png'));
+      const file = new File([blob], 'chukchuk-card.png', { type:'image/png' });
+      if (navigator.canShare && navigator.canShare({ files:[file] })) { await navigator.share({ files:[file], title:'척척 용돈통장', text:`${S.settings.name}이(가) 공부해서 ${won(S.balance)}을 모았어요! 확인코드 ${code()}` }); return; }
+      throw new Error('no share');
+    } catch (e) { if (e && e.name === 'AbortError') return; $('#shareNote').innerHTML = '<b>이 화면을 캡처해서 보내 주세요!</b> (전원+볼륨 아래 버튼을 같이 누르면 캡처돼요)'; }
+  };
+}
+
+// ───── AI ─────
+async function askAI(payload){
+  const s = S.settings; if (!s.aiUrl) throw new Error('noai');
+  const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 20000);
+  try {
+    const r = await fetch(s.aiUrl, { method:'POST', headers:{ 'content-type':'application/json', 'x-app-token':s.aiToken }, body:JSON.stringify(Object.assign({ name:s.name }, payload)), signal:ctl.signal });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json(); if (!j.text) throw new Error('empty'); return j.text;
+  } finally { clearTimeout(tm); }
+}
+let CHAT = [];
+function aiChat(){
+  const s = S.settings, d = daily();
+  const left = Math.max(0, s.aiDaily - d.ai);
+  const intro = s.aiUrl ? `안녕, ${s.name}! 나는 AI 친구 척척이야. 공부하다 궁금한 걸 물어봐. 오늘은 ${left}번 물어볼 수 있어.` : 'AI 친구는 아직 준비 중이에요. 부모님 메뉴에서 연결하면 대화할 수 있어요.';
+  $('#view').innerHTML = `<div class="card" style="display:flex;flex-direction:column;gap:12px">
+    <div class="row"><h2 style="font-size:24px">AI 친구 척척이</h2><span class="note" style="margin-left:auto" id="aiLeft">남은 질문 ${left}</span></div>
+    <div class="chat" id="chat"><div class="msg ai">${esc(intro)}</div>${CHAT.map((m) => `<div class="msg ${m.role === 'user' ? 'me' : 'ai'}">${esc(m.content)}</div>`).join('')}</div>
+    <form class="inrow" id="chatForm"><input id="chatIn" maxlength="200" placeholder="예) 왜 하늘은 파란색이야?" autocomplete="off" ${s.aiUrl && left ? '' : 'disabled'}><button class="btn primary" ${s.aiUrl && left ? '' : 'disabled'}>보내기</button></form>
+    <p class="note">척척이는 사람이 아니라 AI예요. 가끔 틀릴 수 있으니 중요한 건 엄마·아빠나 선생님께 꼭 여쭤봐요.</p>
+    <button class="btn block" id="back">돌아가기</button></div>`;
+  $('#back').onclick = home;
+  $('#chatForm').onsubmit = async (e) => {
+    e.preventDefault(); const inp = $('#chatIn'); const text = inp.value.trim(); if (!text) return;
+    const dd = daily(); if (dd.ai >= s.aiDaily) return toast('오늘 질문은 다 썼어요. 내일 또 만나!');
+    CHAT.push({ role:'user', content:text }); inp.value = ''; inp.disabled = true;
+    const chat = $('#chat'); chat.insertAdjacentHTML('beforeend', `<div class="msg me">${esc(text)}</div><div class="msg ai" id="typing">생각하는 중…</div>`);
+    try {
+      const ans = await askAI({ mode:'chat', grade:s.grade, messages:CHAT.slice(-8) });
+      CHAT.push({ role:'assistant', content:ans }); dd.ai++; save(); $('#typing').textContent = ans; $('#typing').removeAttribute('id');
+    } catch (err) { CHAT.pop(); $('#typing').textContent = '앗, 척척이랑 연결이 안 됐어요. 인터넷을 확인하거나 조금 뒤에 다시 해 봐요.'; $('#typing').removeAttribute('id'); }
+    $('#aiLeft').textContent = '남은 질문 ' + Math.max(0, s.aiDaily - daily().ai); inp.disabled = false; inp.focus();
+  };
+}
+
+// ───── 부모님 메뉴 ─────
+function parentGate(){
+  let pin = '';
+  $('#view').innerHTML = `<div class="card" style="display:flex;flex-direction:column;gap:12px">
+    <h2 style="font-size:24px" class="center">부모님 비밀번호</h2>
+    <div class="pinshow" id="pinshow">○○○○</div>
+    <p class="note center">처음 비밀번호는 0000이에요. 들어가서 꼭 바꿔 주세요.</p>
+    <div class="pad" id="ppad">${[1,2,3,4,5,6,7,8,9].map((n) => `<button data-k="${n}">${n}</button>`).join('')}<button data-k="del" aria-label="지우기">⌫</button><button data-k="0">0</button><button data-k="x" class="go">닫기</button></div></div>`;
+  $('#ppad').onclick = (e) => {
+    const b = e.target.closest('button'); if (!b) return; const k = b.dataset.k;
+    if (k === 'x') return home(); if (k === 'del') pin = pin.slice(0, -1); else pin += k;
+    $('#pinshow').textContent = '●'.repeat(pin.length) + '○'.repeat(Math.max(0, 4 - pin.length));
+    if (pin.length === 4) { if (pin === S.settings.pin) parent(); else { toast('비밀번호가 달라요'); pin = ''; $('#pinshow').textContent = '○○○○'; } }
+  };
+}
+function parent(){
+  const s = S.settings;
+  const f = (id, label, val, type = 'number', extra = '') => `<div class="field"><label for="${id}">${label}</label><input id="${id}" type="${type}" value="${esc(val)}" ${extra}></div>`;
+  $('#view').innerHTML = `
+    <div class="card" style="display:flex;flex-direction:column;gap:12px">
+      <h2 style="font-size:24px">용돈 지급</h2>
+      <p>현재 잔액 <b class="num">${won(S.balance)}</b> · 오늘 칭찬카드 확인코드 <b>${code()}</b></p>
+      <p class="note">아이가 보낸 카드의 확인코드와 같으면 이 기기에서 만든 진짜 카드예요.</p>
+      ${f('payAmt', '지급할 금액(원)', Math.min(S.balance, s.goal) || 0, 'number', 'min="0" step="100" inputmode="numeric"')}
+      <div class="grid2"><button class="btn primary" id="pay">지급 완료 처리</button><button class="btn" id="bonus">칭찬 보너스 넣기</button></div>
+    </div>
+    <div class="card" style="display:flex;flex-direction:column;gap:12px">
+      <h2 style="font-size:24px">설정</h2>
+      ${f('sName', '아이 이름', s.name, 'text', 'maxlength="10"')}
+      <div class="grid2">
+        <div class="field"><label for="sGrade">학년</label><select id="sGrade">${[2,3,4].map((g) => `<option value="${g}" ${g === s.grade ? 'selected' : ''}>${g}학년</option>`).join('')}</select></div>
+        <div class="field"><label for="sSem">학기</label><select id="sSem">${[1,2].map((g) => `<option value="${g}" ${g === s.sem ? 'selected' : ''}>${g}학기</option>`).join('')}</select></div>
+      </div>
+      <label class="row"><input type="checkbox" id="sReview" ${s.review ? 'checked' : ''}> 지난 학기 복습 단원도 넣기</label>
+      <div class="grid2">${f('r1', '쉬움 정답(원)', s.reward[1])}${f('r2', '보통 정답(원)', s.reward[2])}${f('r3', '어려움 정답(원)', s.reward[3])}${f('sCombo', '5콤보 보너스(원)', s.comboBonus)}${f('sPen', '틀리면 빼기(원, 0=안 뺌)', s.penalty)}${f('sCap', '하루 적립 한도(원)', s.dailyCap)}</div>
+      ${f('sGoal', '목표 금액(원) — 채우면 칭찬 카드', s.goal)}
+      ${f('sPin', '부모 비밀번호(숫자 4자리)', s.pin, 'text', 'inputmode="numeric" maxlength="4" pattern="[0-9]{4}"')}
+      <hr><h3 style="font-size:20px">AI 친구 연결</h3>
+      ${f('sAiUrl', 'AI 서버 주소 (Supabase 함수 URL)', s.aiUrl, 'url', 'placeholder="https://xxxx.supabase.co/functions/v1/kid-tutor"')}
+      ${f('sAiTok', '앱 토큰 (APP_TOKEN과 같은 값)', s.aiToken, 'text')}
+      ${f('sAiDaily', '하루 AI 질문 수', s.aiDaily)}
+      <p class="note">Claude API 키는 여기에 넣지 않아요. 키는 서버(Supabase)에만 보관돼요.</p>
+      <button class="btn primary block" id="saveS">설정 저장</button>
+    </div>
+    <div class="card" style="display:flex;flex-direction:column;gap:10px">
+      <h2 style="font-size:20px">초기화</h2>
+      <p class="note">잔액·거래내역·오답노트를 모두 지웁니다. 설정은 남아요.</p>
+      <div id="resetArea"><button class="btn danger" id="reset">모두 지우기</button></div>
+    </div>
+    <button class="btn block" id="back">나가기</button>`;
+  const v = (id) => $('#' + id).value; const n = (id, min = 0) => Math.max(min, Math.floor(+v(id) || 0));
+  $('#pay').onclick = () => { const a = n('payAmt'); if (!a) return toast('금액을 넣어 주세요'); if (a > S.balance) return toast('잔액보다 많아요'); S.balance -= a; addLedger('용돈 지급 (부모님)', -a); save(); toast(won(a) + ' 지급 처리했어요'); parent(); };
+  $('#bonus').onclick = () => { const a = n('payAmt'); if (!a) return toast('금액을 넣어 주세요'); S.balance += a; addLedger('칭찬 보너스', a); save(); toast(won(a) + ' 넣었어요'); parent(); };
+  $('#saveS').onclick = () => {
+    const pin = v('sPin'); if (!/^\d{4}$/.test(pin)) return toast('비밀번호는 숫자 4자리예요');
+    Object.assign(s, { name:v('sName').trim() || '우리 아이', grade:+v('sGrade'), sem:+v('sSem'), review:$('#sReview').checked, reward:{1:n('r1'),2:n('r2'),3:n('r3')}, comboBonus:n('sCombo'), penalty:n('sPen'), dailyCap:n('sCap'), goal:n('sGoal', 100), pin, aiUrl:v('sAiUrl').trim(), aiToken:v('sAiTok').trim(), aiDaily:n('sAiDaily') });
+    save(); renderBook(); toast('저장했어요');
+  };
+  $('#reset').onclick = () => {
+    $('#resetArea').innerHTML = `<p><b>정말 지울까요?</b> 되돌릴 수 없어요.</p><div class="row"><button class="btn danger" id="resetYes">지우기</button><button class="btn" id="resetNo">취소</button></div>`;
+    $('#resetNo').onclick = parent;
+    $('#resetYes').onclick = () => { const st = S.settings; try { localStorage.removeItem(KEY); } catch(e) {} load(); S.settings = st; save(); toast('초기화했어요'); parent(); renderBook(); };
+  };
+  $('#back').onclick = home;
+}
+
+load(); save(); home();
+})();
+</script>
+
+</body>
+</html>

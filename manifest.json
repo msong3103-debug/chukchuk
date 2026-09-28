@@ -1,0 +1,11 @@
+{
+  "name": "척척 용돈통장",
+  "short_name": "척척통장",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#e7f3ee",
+  "theme_color": "#1f6f5c",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
