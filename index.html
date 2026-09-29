@@ -153,7 +153,9 @@ h1,h2,h3,.disp{font-family:var(--display);font-weight:400;margin:0;text-wrap:bal
 .rtbtns .btn{min-height:44px;font-size:14px;padding:4px 2px}
 /* 편집할 때는 방·도구·탭을 머리 바로 아래에 붙이고, 가게만 아래에서 스크롤한다 */
 .rsticky{position:sticky;top:var(--bookh,120px);z-index:4;display:flex;flex-direction:column;gap:8px;background:var(--panel);padding:6px 0 8px;margin:-6px 0 0}
-.rsticky .rstage{width:min(100%,290px);margin:0 auto}
+.rsticky .rstage{width:min(100%,250px);margin:0 auto}
+.rsticky .rtool{padding:6px;gap:4px}
+.rsticky .chips .chip{padding:6px 12px}
 .rshop{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .rsitem{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;border-radius:14px;border:1px solid var(--line);background:var(--panel2);box-shadow:var(--shadow);min-height:48px;font-size:14px;line-height:1.25;text-align:center;word-break:keep-all}
 .rsitem b{font-weight:400}
@@ -187,6 +189,12 @@ h1,h2,h3,.disp{font-family:var(--display);font-weight:400;margin:0;text-wrap:bal
 .oxbtns button.ok{border-color:var(--ok);background:var(--ok-bg)}
 .oxbtns button.no{border-color:var(--bad);background:var(--bad-bg)}
 
+/* 부모님 메뉴: 경고, 대화 기록, 백업 알림 */
+.card.warn{border:2px solid var(--bad);background:var(--bad-bg)}
+.clog{display:flex;flex-direction:column;gap:8px;margin-top:8px;max-height:420px;overflow-y:auto}
+.citem{display:flex;flex-direction:column;gap:2px;padding:8px 10px;border-radius:12px;background:var(--panel2);font-size:15px;word-break:keep-all}
+.bkremind{display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:14px;border:1px dashed var(--bad);color:var(--ink);font-size:14px;background:var(--panel);text-align:left;width:100%;min-height:48px}
+
 /* 첫 화면 바로가기 4칸 */
 .quick{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .quick button{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 4px 8px;border-radius:var(--radius);background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow);font-family:var(--display);font-size:15px;min-height:48px}
@@ -195,6 +203,10 @@ h1,h2,h3,.disp{font-family:var(--display);font-weight:400;margin:0;text-wrap:bal
 /* 머리의 '처음으로' 버튼 */
 .homebtn{flex:none;width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,.18);color:var(--brand-ink);font-size:22px;display:flex;align-items:center;justify-content:center}
 .homebtn[hidden]{display:none}
+.book.compact{padding-top:6px;padding-bottom:6px}
+.book.compact .goal,.book.compact .goal-lab,.book.compact .who small,.book.compact .bal small{display:none}
+.book.compact .bal b{font-size:22px}
+.book.compact .homebtn{width:40px;height:40px}
 
 /* 오늘의 미션 · 우주 탐험 여행 */
 .mission{display:flex;flex-direction:column;gap:6px;padding:12px 16px}
@@ -566,7 +578,12 @@ function renderBook(){
   document.documentElement.style.setProperty('--bookh', $('#book').offsetHeight + 'px'); // 방꾸미기에서 방을 머리 아래에 붙일 때 쓴다
 }
 // 머리의 ← 버튼: 첫 화면이 아닐 때만 보인다. 문제 풀던 중이면 결과(통장 기록)를 먼저 남긴다
-function syncHomeBtn(){ const b = $('#homeBtn'); if (b) b.hidden = !!$('#goPet'); }
+// 첫 화면이 아니면 머리를 한 줄로 줄여(목표 막대 숨김) 화면을 넓게 쓴다
+function syncHomeBtn(){
+  const onHome = !!$('#goPet'), b = $('#homeBtn'); if (b) b.hidden = onHome;
+  $('#book').classList.toggle('compact', !onHome);
+  document.documentElement.style.setProperty('--bookh', $('#book').offsetHeight + 'px');
+}
 function goHome(){
   try { speechSynthesis.cancel(); } catch (e) {}
   if (R) return finishRound();
@@ -655,6 +672,7 @@ function home(){
       <button class="btn" id="goLedger">내 통장 보기</button>
       <button class="btn ghost" id="goParent">부모님 메뉴</button>
     </div>
+    ${bkRemind()}
     <button class="btn ghost block" id="sndBtn" aria-pressed="${s.sound}">소리 ${s.sound ? '켜짐' : '꺼짐'}</button>
     <p class="note center">푼 문제 ${S.stats.solved}개 · 정답률 ${S.stats.solved ? Math.round(S.stats.correct / S.stats.solved * 100) : 0}% · 최고 콤보 ${S.stats.bestCombo}</p>
     ${s.links.length ? `<div class="card" style="display:flex;flex-direction:column;gap:8px">
@@ -673,11 +691,20 @@ function home(){
   $('#goAI').onclick = () => aiChat(); $('#goLedger').onclick = ledger; $('#goParent').onclick = parentGate; $('#goPet').onclick = () => petView(); $('#goGame').onclick = gamesView;
   $('#goStk').onclick = () => stickerView();
   $('#goRoomH').onclick = () => roomEdit();
+  if ($('#bkRemind')) $('#bkRemind').onclick = parentGate;
   $('#goLearn').onclick = () => learnView();
   $('#goTrip').onclick = tripView;
   if ($('#mGift')) $('#mGift').onclick = missionGift;
   $('#sndBtn').onclick = () => { s.sound = !s.sound; save(); const b = $('#sndBtn'); b.textContent = '소리 ' + (s.sound ? '켜짐' : '꺼짐'); b.setAttribute('aria-pressed', s.sound); sfx('ok'); };
   if (reached) $('#goCert').onclick = cert;
+}
+// 첫 화면 백업 알림: 어느 정도 쓴 뒤(푼 문제 10개 이상) 백업한 지 14일이 지났거나 한 번도 안 했으면
+const BACKUP_DAYS = 14;
+function bkRemind(){
+  if (S.stats.solved < 10) return '';
+  const days = S.lastBackup ? dayNum(today()) - dayNum(S.lastBackup) : null;
+  if (days !== null && days < BACKUP_DAYS) return '';
+  return `<button class="bkremind" id="bkRemind"><b>부모님께</b> ${days === null ? '아직 백업한 적이 없어요.' : `백업한 지 ${days}일 됐어요.`} 부모님 메뉴 → 백업에서 저장해 주세요.</button>`;
 }
 // 홈의 출석 도장 줄: 최근 7일
 function attendHtml(){
@@ -818,7 +845,7 @@ async function hint(){
     box.innerHTML = `<div class="hintbox">척척이가 생각하는 중…</div>`;
     try {
       const text = await askAI({ mode:'hint', grade:s.grade, question:{ subject:R.name, unit:q.unit, text:q.q, passage:q.passage || '', choices:q.type === 'mc' ? q.choices : null, answer:q.type === 'mc' ? q.choices[q.answer] : q.answer } });
-      d.ai++; save(); box.innerHTML = `<div class="hintbox"><b>척척이 힌트</b><br>${esc(text)}</div>`; return;
+      d.ai++; chatLog('hint', q.q, text); box.innerHTML = `<div class="hintbox"><b>척척이 힌트</b><br>${esc(text)}</div>`; return;
     } catch (e) { /* 아래 기본 힌트로 */ }
   }
   if (q.type === 'mc' && q.choices.length > 2) {
@@ -1331,7 +1358,7 @@ function roomEdit(sel){
     <div class="rsticky">
       ${roomHTML(true)}
       <div class="rtool" ${selItem ? '' : 'hidden'}>
-        <b class="rtname">${selItem ? esc(selItem.name) : ''} <span class="note">· 두 손가락으로 벌리면 커져요</span></b>
+        <b class="rtname">${selItem ? esc(selItem.name) : ''}</b>
         <div class="rtbtns">
           <button class="btn" data-act="small" aria-label="작게">작게</button><button class="btn" data-act="big" aria-label="크게">크게</button>
           <button class="btn" data-act="flip">뒤집기</button><button class="btn" data-act="back">뒤로</button><button class="btn" data-act="front">앞으로</button>
@@ -1777,6 +1804,23 @@ async function cert(){
   };
 }
 
+// ───── AI 대화 기록 (부모님 확인용, 이 폰에만 저장. 서버에는 남기지 않는다) ─────
+const CHATLOG_MAX = 60;
+function chatLog(mode, ask, answer){
+  S.chatLog = (S.chatLog || []).concat({ t:Date.now(), mode, ask:String(ask).slice(0, 300), answer:String(answer).slice(0, 600) }).slice(-CHATLOG_MAX);
+  save();
+}
+function chatLogHtml(){
+  const log = (S.chatLog || []).slice().reverse();
+  const when = (t) => { const d = new Date(t); return `${d.getMonth() + 1}.${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+  return `<div class="card" style="display:flex;flex-direction:column;gap:10px">
+    <h2 style="font-size:20px">척척이 대화 기록</h2>
+    <p class="note" style="margin:0">아이가 AI 친구에게 물어본 것과 힌트를 최근 ${CHATLOG_MAX}개까지 이 폰에만 남겨요.</p>
+    ${log.length ? `<details><summary>기록 ${log.length}개 보기</summary><div class="clog">${log.map((c) => `<div class="citem"><div class="note">${when(c.t)} · ${c.mode === 'hint' ? '문제 힌트' : '대화'}</div><div><b>${c.mode === 'hint' ? '문제' : '아이'}</b> ${esc(c.ask)}</div><div><b>척척이</b> ${esc(c.answer)}</div></div>`).join('')}</div></details>
+      <button class="btn block" id="clogDel">대화 기록 지우기</button>` : '<p class="note" style="margin:0">아직 대화 기록이 없어요.</p>'}
+  </div>`;
+}
+
 // ───── AI ─────
 async function askAI(payload){
   const s = S.settings; if (!s.aiUrl) throw new Error('noai');
@@ -1807,7 +1851,7 @@ function aiChat(prefill){
     const chat = $('#chat'); chat.insertAdjacentHTML('beforeend', `<div class="msg me">${esc(text)}</div><div class="msg ai" id="typing">생각하는 중…</div>`);
     try {
       const ans = await askAI({ mode:'chat', grade:s.grade, messages:CHAT.slice(-8) });
-      CHAT.push({ role:'assistant', content:ans }); dd.ai++; save(); $('#typing').textContent = ans; $('#typing').removeAttribute('id');
+      CHAT.push({ role:'assistant', content:ans }); dd.ai++; chatLog('chat', text, ans); $('#typing').textContent = ans; $('#typing').removeAttribute('id');
     } catch (err) { CHAT.pop(); $('#typing').textContent = '앗, 척척이랑 연결이 안 됐어요. 인터넷을 확인하거나 조금 뒤에 다시 해 봐요.'; $('#typing').removeAttribute('id'); }
     $('#aiLeft').textContent = '남은 질문 ' + Math.max(0, s.aiDaily - daily().ai); inp.disabled = false; inp.focus();
   };
@@ -1939,6 +1983,7 @@ function parent(){
   const f = (id, label, val, type = 'number', extra = '') => `<div class="field"><label for="${id}">${label}</label><input id="${id}" type="${type}" value="${esc(val)}" ${extra}></div>`;
   const lb = S.lastBackup ? dayNum(today()) - dayNum(S.lastBackup) : null;
   $('#view').innerHTML = `
+    ${s.pin === '0000' ? `<div class="card warn"><b>부모 비밀번호가 아직 0000이에요.</b><p style="margin:4px 0 0">아이가 쉽게 들어와서 보너스나 한도를 바꿀 수 있어요. 아래 '설정'에서 꼭 바꿔 주세요.</p><button class="btn block" id="toPin" style="margin-top:8px">비밀번호 바꾸러 가기</button></div>` : ''}
     ${reportHtml()}
     <div class="card" style="display:flex;flex-direction:column;gap:12px">
       <h2 style="font-size:24px">용돈 지급</h2>
@@ -1986,6 +2031,7 @@ function parent(){
       ${f('lNote', '한 줄 설명 (선택)', '', 'text', 'maxlength="30"')}
       <button class="btn block" id="addLink">링크 넣기</button>
     </div>
+    ${chatLogHtml()}
     <div class="card" style="display:flex;flex-direction:column;gap:10px">
       <h2 style="font-size:20px">백업</h2>
       <p>${lb === null ? '<b style="color:var(--bad)">아직 백업한 적이 없어요.</b>' : lb === 0 ? '오늘 백업했어요.' : `마지막 백업: <b>${lb}일 전</b>${lb >= 14 ? ' <b style="color:var(--bad)">· 새로 백업해 주세요</b>' : ''}`}</p>
@@ -2009,6 +2055,12 @@ function parent(){
     save(); renderBook(); toast('저장했어요');
   };
   $('#repImg').onclick = reportImage;
+  if ($('#toPin')) $('#toPin').onclick = () => { const p = $('#sPin'); p.scrollIntoView({ block:'center' }); p.focus(); p.select(); };
+  if ($('#clogDel')) $('#clogDel').onclick = (e) => {
+    const b = e.currentTarget;
+    if (!b.dataset.sure) { b.dataset.sure = '1'; b.textContent = '정말 지울까요? 한 번 더 누르면 지워요'; b.classList.add('danger'); return; }
+    S.chatLog = []; save(); toast('대화 기록을 지웠어요'); parent();
+  };
   $('#bkSave').onclick = backupSave;
   $('#bkLoad').onclick = () => $('#bkFile').click();
   $('#bkFile').onchange = (e) => { const fl = e.target.files[0]; if (fl) backupLoad(fl); };
