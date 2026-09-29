@@ -1,6 +1,7 @@
 # 척척 용돈통장 — Claude Code 작업 규칙
 
-초등학생 딸(현재 2학년, 4학년까지 사용 예정)이 폰으로 교과 문제를 풀고 용돈을 적립하는 PWA.
+초등학생 아이들(첫째 딸 현재 2학년, 둘째 아들)이 각자 폰으로 교과 문제를 풀고 용돈을 적립하는 PWA. 4학년까지 사용 예정.
+앱 문구에 성별을 넣지 않는다. 아이 이름은 부모님 메뉴에서 폰마다 넣고, 비우면 제목이 '척척 용돈통장'이다.
 GitHub Pages로 배포하고, AI 친구는 Supabase Edge Function을 거쳐 Claude API를 호출한다.
 사용자(부모)는 한국어로 소통한다. 답변과 코드 주석, 앱의 모든 문구는 한국어로 쓴다.
 
@@ -10,7 +11,10 @@ GitHub Pages로 배포하고, AI 친구는 Supabase Edge Function을 거쳐 Clau
 | `index.html` | 앱 전체 (HTML+CSS+JS 한 파일, 빌드 도구 없음) |
 | `math-gen.js` | 수학 자동생성기. `window.MathGen.MATH_UNITS['g{학년}s{학기}']` |
 | `bank-g2.js` | 국어·통합교과 문제은행. `window.QBANK.g2 = {kor:[], int:[]}` |
-| `games-data.js` | 게임 데이터: 행성(`PLANETS`), 낱말 퍼즐(`WORDS`, 맞춤법 함정 글자 `trap`), 연산 스피드 생성기(`speedQ`) |
+| `games-data.js` | 게임 데이터: 행성(`PLANETS`), 낱말 퍼즐(`WORDS`, 맞춤법 함정 글자 `trap`), 연산 스피드 생성기(`speedQ`), 스티커 앨범 |
+| `learn-data.js` | 배움터: 교과 개념 카드(`LESSONS`, 단원명은 실제 문제 단원과 같게), 백과(`BOOK`, 스티커 id와 같음) |
+| `room-data.js` | 방꾸미기: 가구(`CATS` 종류 × 우주·숲속·파스텔 3가지), 벽지·바닥 무늬(코드로 그림) |
+| `img/room/{테마}-{종류}.webp` | 가구 그림. 테마별 3×3 시트를 `CATS` 순서로 잘라 만든다 |
 | `manifest.json`, `icon-*.png`, `apple-touch-icon.png` | 홈 화면 설치 (manifest 링크는 반드시 `<head>` 안) |
 | `img/pet`, `img/subj`, `img/item` | 펫·과목·아이템 그림 (투명 WebP). 제미나이 원본 `img/Gemini_*`은 커밋하지 않음 |
 | `supabase/functions/kid-tutor/index.ts` | AI 프록시 (Deno) |
@@ -62,6 +66,8 @@ K('단원', 난이도, '문제', '정답', ['오답1','오답2','오답3'], '해
 - 게임 놀이터(2026-09-28 부모 확정: 게임도 소액 적립): 태양계 카드·연산 스피드·낱말 퍼즐은 기록에 따라 10/20/30원, 게임마다 하루 3판까지만 적립(`GAME_PLAYS`), 하루 적립 한도 안에서만. 도토리 받기는 적립 없음. 데이터와 연산 생성기는 `games-data.js`(`window.GameData`), 기록은 `S.games.best`, 하루 판수는 `S.daily.games`
 - 출석 도장(`S.attend`): 하루 한 문제라도 풀면 도장. 7일 연속마다 펫 배부름 +30과 우주 스티커 1장 (돈은 주지 않음)
 - 스티커 앨범(`S.stickers`, 데이터는 `games-data.js`의 `STICKER_SETS`·`STICKERS`): 앨범 9장씩(태양계 → 우주 탐험 → 동물 친구들), 앞 앨범을 다 모으면 다음 앨범이 열린다. 출석 7일 연속·10문제 만점·태양계 카드 순서 무실수·연산 스피드 20개 이상·낱말 퍼즐 별 5개로 받는다. 하루 3장까지(`STICKER_DAILY`), 열린 앨범의 없는 것부터. 같은 스티커 3장이면 반짝 스티커. 그림은 `img/sticker/{id}.webp`(태양계는 `img/planet`), 그림이 없으면 글자 스티커로 대신 보인다. 스티커 설명도 확실한 사실만 쓴다
+- 배움터(`S.learn`): 개념 카드를 끝까지 보고 확인 문제를 모두 맞히면 처음 한 번 `settings.learnReward`원(기본 20), 백과 O/X를 처음 맞히면 그 절반. 하루 적립 한도 안에서. 풀면 출석 도장도 찍힌다
+- 방꾸미기(`S.room`, 2026-09-29 부모 확정: 가구는 적립금으로 산다): 가구 50~200원, 벽지·바닥 60~80원(기본은 무료, 한 번 사면 다시 고를 때 무료). 펫 먹이와 같은 하루 쓰기 한도 `settings.petCap`을 함께 쓴다(`shopSpend`). 같은 가구를 여러 개 살 수 있고, 창고에 넣었다 꺼낼 수 있다. 위치는 방 크기 대비 %. 예전 펫 가게의 통나무 집·나뭇잎 이불은 '특별' 가구로 옮겼다
 - 하루 게임 판수 제한 `settings.gameCap`(기본 10, 0=무제한). 게임 시작할 때 센다
 - 부모 리포트용 기록: `S.report`(날짜별 과목, 60일 보관), `S.units`(단원별 누적)
 - 백업: 부모님 메뉴에서 `{app:'chukchuk-bank', v:1, savedAt, data:S}` JSON 파일로 저장·복원. 복원은 확인 후 덮어쓰고 `load()`로 기본값 병합
