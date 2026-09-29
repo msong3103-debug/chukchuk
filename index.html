@@ -189,6 +189,19 @@ h1,h2,h3,.disp{font-family:var(--display);font-weight:400;margin:0;text-wrap:bal
 .oxbtns button.ok{border-color:var(--ok);background:var(--ok-bg)}
 .oxbtns button.no{border-color:var(--bad);background:var(--bad-bg)}
 
+/* 꿈 저금통 */
+.dreambar{display:flex;align-items:center;gap:12px;width:100%;padding:10px 14px;border-radius:var(--radius);background:var(--panel);border:2px solid var(--coin);box-shadow:var(--shadow);text-align:left;min-height:56px}
+.dreambar b{font-family:var(--display);font-weight:400;font-size:18px}
+.dreambar small{display:block;color:var(--muted);font-size:13px}
+.dreambar.empty{border-style:dashed}
+.dreambar.ready{background:var(--ok-bg);border-color:var(--ok)}
+.dream-emoji{line-height:1;flex:none}
+.dream-photo{flex:none;object-fit:cover;border-radius:12px;border:2px solid var(--line)}
+.jar{width:170px;height:auto}
+.dicons{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+.dicons button{font-size:28px;min-height:48px;border-radius:12px;border:2px solid var(--line);background:var(--panel2)}
+.dicons button[aria-pressed="true"]{border-color:var(--brand);background:var(--ok-bg)}
+
 /* 부모님 메뉴: 경고, 대화 기록, 백업 알림 */
 .card.warn{border:2px solid var(--bad);background:var(--bad-bg)}
 .clog{display:flex;flex-direction:column;gap:8px;margin-top:8px;max-height:420px;overflow-y:auto}
@@ -444,6 +457,7 @@ function load(){
   S.learn = Object.assign({ done:{}, ox:{} }, S.learn || {}); // 배움터: 통과한 개념 카드, 맞힌 백과 OX
   S.trip = Object.assign({ fuel:0, stop:0, laps:0 }, S.trip || {}); // 우주 탐험 여행: 연료(이번 바퀴), 도착한 곳 수, 완주 횟수
   S.dict = Object.assign({ best:{} }, S.dict || {});                // 받아쓰기 급수별 최고 점수
+  S.dream = Object.assign({ name:'', price:0, icon:'🎁', photo:'', since:'', done:[] }, S.dream || {}); // 꿈 저금통
   // 방꾸미기: 벽지·바닥, 가진 가구 수, 놓은 가구(위치·크기·뒤집기), 도토리 위치
   S.room = Object.assign({ wall:'mint', floor:'wood', walls:['mint'], floors:['wood'], owned:{}, placed:[], pet:{ x:50, y:80, s:1, f:false }, seq:0 }, S.room || {});
   if (!S.room.moved) { // 예전 펫 가게에서 산 통나무 집·나뭇잎 이불을 방으로 옮긴다
@@ -654,6 +668,7 @@ function home(){
       <button id="goRoomH"><img src="img/room/pastel-chair.webp" alt="" width="44" height="44"><span>방꾸미기</span></button>
       <button id="goStk"><img src="img/planet/saturn.webp" alt="" width="44" height="44"><span>스티커 <small class="num">${stkCount()}/${STK().length}</small></span></button>
     </div>
+    ${dreamHTML()}
     ${missionHTML()}
     <div class="card" style="display:flex;flex-direction:column;gap:12px">
       <div class="row"><h2 style="font-size:24px">오늘은 뭘 풀어 볼까?</h2><span class="note" style="margin-left:auto">오늘 ${won(d.earned)} / ${won(s.dailyCap)}</span></div>
@@ -691,6 +706,7 @@ function home(){
   $('#goAI').onclick = () => aiChat(); $('#goLedger').onclick = ledger; $('#goParent').onclick = parentGate; $('#goPet').onclick = () => petView(); $('#goGame').onclick = gamesView;
   $('#goStk').onclick = () => stickerView();
   $('#goRoomH').onclick = () => roomEdit();
+  $('#goDream').onclick = () => dreamView();
   if ($('#bkRemind')) $('#bkRemind').onclick = parentGate;
   $('#goLearn').onclick = () => learnView();
   $('#goTrip').onclick = tripView;
@@ -1287,6 +1303,115 @@ function bookView(id){
   $('#back').onclick = () => learnView();
 }
 
+// ───── 꿈 저금통 ─────
+// 아이가 갖고 싶은 것(이름·가격·아이콘 또는 사진)을 정하면 통장 잔액만큼 저금통이 찬다.
+// 최근 7일 동안 모은 속도로 남은 날을 어림하고, 방꾸미기에서 50원 이상 살 때 "꿈까지 며칠 더"를 한 번 묻는다.
+// 실제 돈은 움직이지 않는다(부모님이 '용돈 지급'으로 처리)
+const DREAM_ICONS = ['🎁', '🧸', '🧱', '🎨', '📚', '🚲', '⚽', '🎹', '🛼', '🪀', '🐶', '🦖'];
+const DREAM_ASK_MIN = 50;
+const hasDream = () => !!(S.dream.name && S.dream.price > 0);
+function dreamPace(){ // 최근 7일 하루 평균 모은 돈. 통장을 만든 지 7일이 안 됐으면 실제 쓴 날수로 나눈다
+  const now = Date.now(), first = S.ledger.length ? S.ledger[0].t : now;
+  const span = Math.min(7, Math.max(1, Math.ceil((now - first) / 86400000)));
+  const from = now - span * 86400000; let sum = 0;
+  for (const e of S.ledger) if (e.t >= from && e.in) sum += e.in;
+  return sum / span;
+}
+// 남은 날 어림. 모은 기록이 없거나 1년이 넘으면 null (숫자 대신 응원 문구)
+function dreamDays(left){ const p = dreamPace(); if (p < 1) return null; const n = Math.ceil(left / p); return n > 365 ? null : n; }
+function dreamIcon(size){
+  return S.dream.photo ? `<img class="dream-photo" src="${S.dream.photo}" alt="" style="width:${size}px;height:${size}px">` : `<span class="dream-emoji" style="font-size:${Math.round(size * 0.8)}px">${S.dream.icon}</span>`;
+}
+function dreamHTML(){
+  if (!hasDream()) return `<button class="dreambar empty" id="goDream"><span class="dream-emoji" style="font-size:30px">🐷</span><span><b>꿈 저금통</b><small>갖고 싶은 것을 정하고 모아 봐요!</small></span></button>`;
+  const d = S.dream, pctv = Math.min(100, Math.round(S.balance / d.price * 100)), left = Math.max(0, d.price - S.balance), days = dreamDays(left);
+  return `<button class="dreambar ${left ? '' : 'ready'}" id="goDream">${dreamIcon(40)}
+    <span style="flex:1;min-width:0"><b>${esc(d.name)}</b> <small class="num">${won(Math.min(S.balance, d.price))} / ${won(d.price)}${left ? (days ? ` · 약 ${days}일` : '') : ' · 살 수 있어요!'}</small>
+    <span class="gauge exp"><i style="width:${pctv}%"></i></span></span></button>`;
+}
+function jarSVG(pctv){ // 저금통(유리병)에 동전이 차오르는 그림
+  const h = 150 * pctv / 100, coins = Array.from({ length:Math.round(pctv / 6) }, (_, i) => `<ellipse cx="${62 + ((i * 37) % 76)}" cy="${214 - (i * 150 / 17)}" rx="13" ry="5" fill="#f2b632" stroke="#b8860b" stroke-width="2"/>`).join('');
+  return `<svg viewBox="0 0 200 240" class="jar" role="img" aria-label="저금통 ${pctv}% 찼어요">
+    <defs><clipPath id="jarIn"><path d="M52 60 Q40 70 40 100 L40 200 Q40 226 70 226 L130 226 Q160 226 160 200 L160 100 Q160 70 148 60 Z"/></clipPath></defs>
+    <g clip-path="url(#jarIn)"><rect x="30" y="${226 - h}" width="140" height="${h}" fill="#ffe7a3"/>${coins}</g>
+    <path d="M52 60 Q40 70 40 100 L40 200 Q40 226 70 226 L130 226 Q160 226 160 200 L160 100 Q160 70 148 60 Z" fill="none" stroke="#18352f" stroke-width="5"/>
+    <rect x="58" y="38" width="84" height="24" rx="8" fill="#1f6f5c" stroke="#18352f" stroke-width="5"/>
+    <rect x="86" y="44" width="28" height="8" rx="4" fill="#18352f"/>
+    <text x="100" y="140" text-anchor="middle" font-family="Jua, sans-serif" font-size="30" fill="#18352f">${pctv}%</text></svg>`;
+}
+function dreamView(edit){
+  const d = S.dream;
+  if (edit || !hasDream()) return dreamEdit();
+  const pctv = Math.min(100, Math.round(S.balance / d.price * 100)), left = Math.max(0, d.price - S.balance), days = dreamDays(left), pace = Math.round(dreamPace());
+  $('#view').innerHTML = `<div class="card center" style="display:flex;flex-direction:column;gap:10px;align-items:center">
+    <div class="eyebrow">꿈 저금통</div>
+    <div style="display:flex;align-items:center;gap:10px">${dreamIcon(64)}<span class="disp" style="font-size:26px">${esc(d.name)}</span></div>
+    ${jarSVG(pctv)}
+    <div class="big-num num" style="font-size:30px">${won(Math.min(S.balance, d.price))} / ${won(d.price)}</div>
+    ${left ? `<p style="margin:0">앞으로 <b>${won(left)}</b> 더 모으면 돼요!</p>
+      <p class="note" style="margin:0">${days ? `요즘처럼 하루에 ${won(pace)}씩 모으면 <b>약 ${days}일</b> 걸려요.` : pace >= 1 ? '조금씩 모으면 꼭 이룰 수 있어요! 문제를 더 풀어 볼까요?' : '문제를 풀면 얼마나 걸릴지 알려 줄게요.'}</p>`
+    : `<p style="margin:0"><b>통장에 모인 돈으로 살 수 있어요!</b></p><p class="note" style="margin:0">엄마·아빠께 말씀드려요. 부모님이 용돈으로 주시면 꿈을 이뤄요.</p>
+      <button class="btn coin block" id="dreamDone">꿈 이뤘어요!</button>`}
+    <p class="note" style="margin:0">가구를 살 때마다 꿈이 조금 멀어져요. 아껴 쓰면 더 빨리 이뤄요!</p>
+    <div class="grid2" style="width:100%"><button class="btn" id="dreamEdit">꿈 바꾸기</button><button class="btn" id="back">돌아가기</button></div>
+    ${d.done.length ? `<div style="width:100%;text-align:left"><b>이룬 꿈</b><ul style="margin:4px 0;padding-left:20px">${d.done.slice().reverse().map((x) => `<li>${esc(x.name)} <span class="note">${won(x.price)} · ${x.date}</span></li>`).join('')}</ul></div>` : ''}
+  </div>`;
+  if ($('#dreamDone')) $('#dreamDone').onclick = () => {
+    d.done.push({ name:d.name, price:d.price, date:today() }); const name = d.name;
+    Object.assign(d, { name:'', price:0, icon:'🎁', photo:'', since:'' }); save(); sfx('win'); grantSticker();
+    toast(`${josa(name, '을', '를')} 이뤘어요! 정말 멋져요!`); dreamView();
+  };
+  $('#dreamEdit').onclick = () => dreamEdit();
+  $('#back').onclick = home;
+}
+function dreamEdit(){
+  const d = S.dream; let icon = d.icon, photo = d.photo;
+  $('#view').innerHTML = `<div class="card" style="display:flex;flex-direction:column;gap:12px">
+    <h2 style="font-size:24px">꿈 저금통 만들기</h2>
+    <p class="note" style="margin:0">갖고 싶은 것과 가격을 정해요. 가격을 모르면 엄마·아빠께 여쭤봐요.</p>
+    <div class="field"><label for="dName">갖고 싶은 것</label><input id="dName" maxlength="20" value="${esc(d.name)}" placeholder="예) 레고 우주선"></div>
+    <div class="field"><label for="dPrice">가격(원)</label><input id="dPrice" type="number" min="100" step="100" inputmode="numeric" value="${d.price || ''}" placeholder="예) 15000"></div>
+    <div><div class="note" style="margin-bottom:6px">그림 고르기</div><div class="dicons">${DREAM_ICONS.map((e) => `<button data-icon="${e}" aria-pressed="${!photo && e === icon}">${e}</button>`).join('')}</div></div>
+    <div class="row"><button class="btn" id="dPhotoBtn">사진 찍어 넣기</button><span id="dPhotoPrev">${photo ? `<img class="dream-photo" src="${photo}" alt="" style="width:56px;height:56px">` : ''}</span></div>
+    <input type="file" id="dPhoto" accept="image/*" capture="environment" hidden>
+    <button class="btn primary block" id="dSave">꿈 저금통 시작!</button>
+    ${hasDream() ? '<button class="btn ghost block" id="dClear">꿈 지우기</button>' : ''}
+    <button class="btn block" id="back">돌아가기</button>
+    ${d.done.length ? `<div><b>지금까지 이룬 꿈 ${d.done.length}개</b><ul style="margin:4px 0;padding-left:20px">${d.done.slice().reverse().map((x) => `<li>${esc(x.name)} <span class="note">${won(x.price)} · ${x.date}</span></li>`).join('')}</ul></div>` : ''}</div>`;
+  const mark = () => $('#view').querySelectorAll('[data-icon]').forEach((b) => b.setAttribute('aria-pressed', !photo && b.dataset.icon === icon));
+  $('#view').querySelectorAll('[data-icon]').forEach((b) => b.onclick = () => { icon = b.dataset.icon; photo = ''; $('#dPhotoPrev').innerHTML = ''; mark(); sfx('tap'); });
+  $('#dPhotoBtn').onclick = () => $('#dPhoto').click();
+  $('#dPhoto').onchange = (e) => { // 사진은 작게 줄여서(240px JPEG) 저장한다
+    const f = e.target.files[0]; if (!f) return; const url = URL.createObjectURL(f), im = new Image();
+    im.onload = () => { const k = 240 / Math.max(im.width, im.height), c = document.createElement('canvas'); c.width = Math.round(im.width * Math.min(1, k)); c.height = Math.round(im.height * Math.min(1, k));
+      c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); photo = c.toDataURL('image/jpeg', 0.8); URL.revokeObjectURL(url);
+      $('#dPhotoPrev').innerHTML = `<img class="dream-photo" src="${photo}" alt="" style="width:56px;height:56px">`; mark(); };
+    im.src = url;
+  };
+  $('#dSave').onclick = () => {
+    const name = $('#dName').value.trim(), price = Math.floor(+$('#dPrice').value || 0);
+    if (!name) return toast('갖고 싶은 것을 적어 주세요');
+    if (price < 100 || price > 1000000) return toast('가격은 100원부터 100만 원까지 넣어 주세요');
+    Object.assign(d, { name, price, icon, photo, since:d.since || today() }); save(); sfx('win'); dreamView();
+  };
+  if ($('#dClear')) $('#dClear').onclick = () => { Object.assign(d, { name:'', price:0, icon:'🎁', photo:'', since:'' }); save(); home(); };
+  $('#back').onclick = () => (hasDream() ? dreamView() : home());
+}
+// 50원 이상 살 때 꿈이 있으면 한 번 묻는다. go()는 살래요를 골랐을 때 실행
+function dreamAsk(price, label, go){
+  if (!hasDream() || price < DREAM_ASK_MIN || S.balance >= S.dream.price + price) return go();
+  const pace = dreamPace(), more = pace >= 1 ? Math.max(1, Math.round(price / pace)) : null;
+  const el = document.createElement('div'); el.className = 'stk-pop'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', '꿈 저금통 확인');
+  el.innerHTML = `<div class="stk-card">${dreamIcon(72)}
+    <div class="disp" style="font-size:20px">${esc(josa(label, '을', '를'))} 사면</div>
+    <p style="margin:0">${esc(josa(S.dream.name, '이', '가'))} ${won(price)}만큼 멀어져요.${more && more <= 60 ? `<br>꿈까지 <b>약 ${more}일</b> 더 걸려요.` : ''}</p>
+    <div class="grid2" style="width:100%"><button class="btn" id="dkSave">아낄래요</button><button class="btn coin" id="dkBuy">살래요</button></div></div>`;
+  document.body.appendChild(el);
+  el.querySelector('#dkSave').onclick = () => { el.remove(); toast('멋져요! 꿈에 한 걸음 더 가까워졌어요.'); };
+  el.querySelector('#dkBuy').onclick = () => { el.remove(); go(); };
+  el.querySelector('#dkSave').focus();
+}
+
 // ───── 가게 공통: 적립금으로 사기 (펫 먹이·방꾸미기가 하루 쓰기 한도 petCap을 같이 쓴다) ─────
 function shopSpend(price, memo){
   const d = daily(), cap = S.settings.petCap, spent = d.spent || 0;
@@ -1379,15 +1504,18 @@ function roomEdit(sel){
   $('#view').querySelectorAll('[data-cat]').forEach((b) => b.onclick = () => { RE.cat = b.dataset.cat; roomEdit(); });
   $('#view').querySelectorAll('[data-buy]').forEach((b) => b.onclick = () => {
     const it = rItem(b.dataset.buy);
-    if (!shopSpend(it.price, `가구: ${it.name} (방꾸미기)`)) return;
-    r.owned[it.id] = (r.owned[it.id] || 0) + 1; const u = placeItem(it.id); sfx('win'); toast(`${josa(it.name, '을', '를')} 샀어요! 끌어서 옮겨 봐요.`); roomEdit(u);
+    dreamAsk(it.price, it.name, () => {
+      if (!shopSpend(it.price, `가구: ${it.name} (방꾸미기)`)) return;
+      r.owned[it.id] = (r.owned[it.id] || 0) + 1; const u = placeItem(it.id); sfx('win'); toast(`${josa(it.name, '을', '를')} 샀어요! 끌어서 옮겨 봐요.`); roomEdit(u);
+    });
   });
   $('#view').querySelectorAll('[data-put]').forEach((b) => b.onclick = () => { const u = placeItem(b.dataset.put); sfx('tap'); roomEdit(u); });
   for (const [key, list, own] of [['wall', RD.WALLS, 'walls'], ['floor', RD.FLOORS, 'floors']]) {
     $('#view').querySelectorAll(`[data-${key}]`).forEach((b) => b.onclick = () => {
       const p = list.find((x) => x.id === b.dataset[key]);
-      if (!r[own].includes(p.id)) { if (!shopSpend(p.price, `${key === 'wall' ? '벽지' : '바닥'}: ${p.name} (방꾸미기)`)) return; r[own].push(p.id); }
-      r[key] = p.id; save(); sfx('tap'); roomEdit();
+      const apply = () => { r[key] = p.id; save(); sfx('tap'); roomEdit(); };
+      if (r[own].includes(p.id)) return apply();
+      dreamAsk(p.price, p.name, () => { if (!shopSpend(p.price, `${key === 'wall' ? '벽지' : '바닥'}: ${p.name} (방꾸미기)`)) return; r[own].push(p.id); apply(); });
     });
   }
   $('#view').querySelectorAll('[data-act]').forEach((b) => b.onclick = () => roomAct(b.dataset.act));
