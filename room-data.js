@@ -9,6 +9,7 @@
     { id:'space',  name:'우주' },
     { id:'forest', name:'숲속' },
     { id:'pastel', name:'파스텔' },
+    { id:'season', name:'계절' },
   ];
   // 가구 종류: 시트 칸 순서와 같다. w·y·layer는 종류별 기본값
   const CATS = [
@@ -22,6 +23,7 @@
     { id:'storage', name:'수납장',    price:150, w:28, y:62, layer:'floor' },
     { id:'deco',    name:'소품',      price:50,  w:16, y:74, layer:'floor' },
     { id:'special', name:'특별',      price:0,   w:30, y:72, layer:'floor' },
+    { id:'season',  name:'계절 한정', price:0,   w:24, y:72, layer:'floor' },
   ];
   const NAMES = {
     space:  ['로켓 침대','은하수 빈백','지구본 책상','별 러그','달 무드등','토성 포스터','별이 보이는 둥근 창','행성 선반','우주 헬멧'],
@@ -29,10 +31,23 @@
     pastel: ['하트 캐노피 침대','구름 소파','딸기 케이크 탁자','무지개 러그','튤립 램프','하트 거울','커튼 달린 아치 창','파스텔 서랍장','풍선'],
   };
   const ITEMS = [];
-  for (const t of THEMES) CATS.slice(0, 9).forEach((c, i) => ITEMS.push({ id:`${t.id}-${c.id}`, cat:c.id, theme:t.id, name:NAMES[t.id][i], price:c.price, w:c.w, y:c.y, layer:c.layer }));
+  for (const t of THEMES.filter((x) => NAMES[x.id])) CATS.slice(0, 9).forEach((c, i) => ITEMS.push({ id:`${t.id}-${c.id}`, cat:c.id, theme:t.id, name:NAMES[t.id][i], price:c.price, w:c.w, y:c.y, layer:c.layer }));
   // 특별 가구: 예전 펫 가게에서 팔던 것 (산 적이 있으면 그대로 가져온다)
   ITEMS.push({ id:'house', cat:'special', theme:'forest', name:'통나무 집',   price:200, w:32, y:70, layer:'floor', src:'img/item/house.webp' });
   ITEMS.push({ id:'leaf',  cat:'special', theme:'forest', name:'나뭇잎 이불', price:100, w:40, y:88, layer:'rug',   src:'img/item/leaf.webp' });
+  // 계절 한정: months에 든 달에만 가게에 나온다(산 것은 계속 가진다). 그림은 시트 한 장(3×3)을 이 순서로 자른다
+  const SEASON = [
+    ['pumpkin',  '호박 등불',       80, 18, 72, 'floor', [10]],
+    ['bats',     '박쥐 가랜드',     80, 50, 12, 'wall',  [10]],
+    ['candy',    '호박 사탕 바구니', 60, 16, 76, 'floor', [10]],
+    ['ghost',    '꼬마 유령 인형',   60, 16, 74, 'floor', [10]],
+    ['tree',     '크리스마스트리',  150, 30, 60, 'floor', [12]],
+    ['gifts',    '선물 상자',       80, 22, 80, 'floor', [12]],
+    ['stocking', '크리스마스 양말',  60, 14, 30, 'wall',  [12]],
+    ['snowman',  '눈사람 인형',      80, 18, 74, 'floor', [12]],
+    ['wreath',   '리스',            80, 20, 22, 'wall',  [12]],
+  ];
+  for (const [id, name, price, w, y, layer, months] of SEASON) ITEMS.push({ id:`season-${id}`, cat:'season', theme:'season', name, price, w, y, layer, months });
   // 무늬 종류: vstripe(세로 줄) hstripe(가로 줄) dots(물방울) stars(별 밤) checker(체크)
   const WALLS = [
     { id:'mint',  name:'민트 줄무늬',     price:0,  base:'#e7f3ee', kind:'vstripe', c2:'#d6ebe1', size:22 },

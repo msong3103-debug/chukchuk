@@ -182,6 +182,29 @@ h1,h2,h3,.disp{font-family:var(--display);font-weight:400;margin:0;text-wrap:bal
 .oxbtns button.ok{border-color:var(--ok);background:var(--ok-bg)}
 .oxbtns button.no{border-color:var(--bad);background:var(--bad-bg)}
 
+/* 오늘의 미션 · 우주 탐험 여행 */
+.mission{display:flex;flex-direction:column;gap:6px;padding:12px 16px}
+.mrow{display:flex;align-items:center;gap:8px;font-size:16px}
+.mrow.done{color:var(--muted);text-decoration:line-through}
+.mchk{width:22px;height:22px;flex:none;border-radius:6px;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--brand-ink);background:var(--panel)}
+.mrow.done .mchk{background:var(--ok);border-color:var(--ok)}
+.tripbar{display:flex;align-items:center;gap:10px;width:100%;margin-top:4px;padding:8px 10px;border-radius:14px;background:#1d2350;color:#fff;text-align:left;min-height:48px}
+.tripbar .note{color:#c9d0f0}
+.tripbar .gauge{background:rgba(255,255,255,.2)}
+.tripbar .stk-ph,.track .stk-ph{font-size:16px}
+.track{position:relative;display:flex;flex-direction:column;gap:6px;padding:12px;border-radius:var(--radius);background:linear-gradient(#1d2350,#2a1f4f);color:#fff}
+.tstop{position:relative;display:flex;align-items:center;gap:12px;padding:6px 8px;border-radius:12px;opacity:.55}
+.tstop.done{opacity:1}
+.tstop small{display:block;font-size:12px;color:#c9d0f0}
+.trocket{position:absolute;right:8px;animation:float 1.6s ease-in-out infinite}
+@keyframes float{50%{transform:translateY(-6px)}}
+/* 받아쓰기 */
+.dict-in{min-height:56px;border-radius:14px;border:3px solid var(--brand);background:var(--panel);color:var(--ink);padding:0 14px;font:inherit;font-size:21px;width:100%}
+.dans{font-family:var(--display);font-size:20px;letter-spacing:.5px}
+.dans mark{background:var(--bad-bg);color:var(--bad);border-bottom:3px solid var(--bad);border-radius:4px;padding:0 1px}
+.field textarea{border-radius:12px;border:2px solid var(--line);background:var(--panel);color:var(--ink);padding:8px 12px;font:inherit;width:100%}
+@media (prefers-reduced-motion:reduce){.trocket{animation:none}}
+
 /* 게임 놀이터 */
 .gcard{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:12px 14px;border-radius:var(--radius);background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow);min-height:72px}
 .gcard img{width:52px;height:52px;flex:none}
@@ -393,6 +416,8 @@ function load(){
   S.report = S.report || {};       // 날짜별 과목 기록 { 'YYYY-MM-DD': { math:[푼 수, 맞힌 수] } }
   S.units = S.units || {};         // 단원별 누적 { 'math|단원': [푼 수, 맞힌 수] }
   S.learn = Object.assign({ done:{}, ox:{} }, S.learn || {}); // 배움터: 통과한 개념 카드, 맞힌 백과 OX
+  S.trip = Object.assign({ fuel:0, stop:0, laps:0 }, S.trip || {}); // 우주 탐험 여행: 연료(이번 바퀴), 도착한 곳 수, 완주 횟수
+  S.dict = Object.assign({ best:{} }, S.dict || {});                // 받아쓰기 급수별 최고 점수
   // 방꾸미기: 벽지·바닥, 가진 가구 수, 놓은 가구(위치·크기·뒤집기), 도토리 위치
   S.room = Object.assign({ wall:'mint', floor:'wood', walls:['mint'], floors:['wood'], owned:{}, placed:[], pet:{ x:50, y:80, s:1, f:false }, seq:0 }, S.room || {});
   if (!S.room.moved) { // 예전 펫 가게에서 산 통나무 집·나뭇잎 이불을 방으로 옮긴다
@@ -408,7 +433,7 @@ function load(){
   if (!raw) S.ledger.push({ t:Date.now(), memo:'통장 만들기', in:0, out:0, bal:0 });
 }
 function save(){ try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e) {} }
-function daily(){ if (S.daily.date !== today()) S.daily = { date:today(), earned:0, ai:0, spent:0, games:{}, plays:0, stickers:0 }; return S.daily; }
+function daily(){ if (S.daily.date !== today()) S.daily = { date:today(), earned:0, ai:0, spent:0, games:{}, plays:0, stickers:0, m:{}, gift:false }; return S.daily; }
 function addLedger(memo, amt){ S.ledger.push({ t:Date.now(), memo, in:amt>0?amt:0, out:amt<0?-amt:0, bal:S.balance }); if (S.ledger.length > 300) S.ledger = S.ledger.slice(-300); }
 
 function toast(msg){ const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => t.hidden = true, 2200); }
@@ -582,6 +607,7 @@ function home(){
         <span class="note">${mood === 'hungry' ? '<b style="color:var(--bad)">배고파요! 먹이를 주세요</b>' : next ? `다음 단계까지 ${next.need - p.exp}문제` : '다 자랐어요! 새 알을 받을 수 있어요'}</span>
         <span class="gauge ${p.full < PET_HUNGRY ? 'low' : ''}" role="progressbar" aria-label="배부름" aria-valuenow="${p.full}" aria-valuemin="0" aria-valuemax="100"><i style="width:${p.full}%"></i></span></span>
     </button>
+    ${missionHTML()}
     <div class="card wonder">
       <div class="eyebrow">오늘의 궁금증</div>
       <p class="disp" id="wonderQ" aria-live="polite"></p>
@@ -620,6 +646,8 @@ function home(){
   $('#goAI').onclick = () => aiChat(); $('#goLedger').onclick = ledger; $('#goParent').onclick = parentGate; $('#goPet').onclick = () => petView(); $('#goGame').onclick = gamesView;
   $('#goStk').onclick = () => stickerView();
   $('#goLearn').onclick = () => learnView();
+  $('#goTrip').onclick = tripView;
+  if ($('#mGift')) $('#mGift').onclick = missionGift;
   $('#sndBtn').onclick = () => { s.sound = !s.sound; save(); const b = $('#sndBtn'); b.textContent = '소리 ' + (s.sound ? '켜짐' : '꺼짐'); b.setAttribute('aria-pressed', s.sound); sfx('ok'); };
   if (reached) $('#goCert').onclick = cert;
 }
@@ -734,6 +762,7 @@ function answer(val){
   save(); renderBook();
   sfx(correct ? 'ok' : 'no'); if (petMsg.includes('자랐어요') || petMsg.includes('되었어요')) sfx('win');
   markAttend();
+  if (correct) { mission('solve'); if (R.review) mission('review'); tripAdd(1); }
   // 표시
   if (q.type === 'mc') $('#answerArea').querySelectorAll('.choice').forEach((b) => { b.disabled = true; const i = +b.dataset.i; if (i === q.answer) b.classList.add('ok'); else if (i === val) b.classList.add('no'); });
   else { const box = $('#ansbox'); box.style.borderColor = correct ? 'var(--ok)' : 'var(--bad)'; }
@@ -908,7 +937,189 @@ function petView(say, hop){
   });
   if (done) $('#newEgg').onclick = () => { p.exp = 0; p.full = 100; save(); petView('새 도토리 알이에요! 문제를 풀면 깨어나요.', true); };
   $('#goRoom').onclick = () => roomEdit();
+  const pet = $('#rstage .rpet'); if (pet) { pet.style.cursor = 'pointer'; pet.setAttribute('role', 'button'); pet.setAttribute('aria-label', `${PET_NAME} 쓰다듬기`); pet.onclick = () => petPat($('.bubble')); }
   $('#back').onclick = home;
+}
+
+// ───── 우주 탐험 여행 ─────
+// 정답 1개 = 연료 1 (개념 카드 통과 3, 백과 퀴즈·받아쓰기 정답 1). 지구에서 출발해 해왕성까지 가면 한 바퀴 완주
+// 도착하면 그 곳의 백과 사실 하나와 스티커(하루 한도 안에서), 도토리 배부름 +10. 돈은 주지 않는다
+const TRIP = [
+  { id:'moon', need:10 }, { id:'mars', need:30 }, { id:'jupiter', need:60 },
+  { id:'saturn', need:100 }, { id:'uranus', need:150 }, { id:'neptune', need:210 },
+];
+const stkById = (id) => STK().find((x) => x.id === id);
+function tripAdd(n){
+  const t = S.trip; t.fuel += n; const arrived = [];
+  while (t.stop < TRIP.length && t.fuel >= TRIP[t.stop].need) { arrived.push(TRIP[t.stop].id); t.stop++; }
+  let lap = false;
+  if (t.stop >= TRIP.length) { t.laps++; t.fuel = 0; t.stop = 0; lap = true; }
+  save();
+  if (arrived.length) setTimeout(() => tripArrive(arrived[arrived.length - 1], lap), 700);
+}
+function tripArrive(id, lap){
+  const st = stkById(id), fact = (LD.BOOK[id] || { facts:[''] }).facts[0];
+  S.pet.full = Math.min(100, S.pet.full + 10); save();
+  const el = document.createElement('div'); el.className = 'stk-pop'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', '우주 탐험 도착');
+  el.innerHTML = `<div class="stk-card"><div class="eyebrow">우주 탐험 여행</div>
+    <span class="stk-big">${stkImg(st, 130)}</span><div class="disp" style="font-size:26px">${esc(st.ko)} 도착!</div>
+    <p style="margin:0">${esc(fact)}</p><p class="note" style="margin:0">${PET_NAME} 배부름 +10${lap ? ' · 태양계 한 바퀴 완주! 다시 지구에서 출발해요.' : ''}</p>
+    <button class="btn primary block">좋아요!</button></div>`;
+  document.body.appendChild(el); sfx('win');
+  el.querySelector('button').onclick = () => { el.remove(); grantSticker(); };
+  el.querySelector('button').focus();
+}
+function tripHTML(){
+  const t = S.trip, next = TRIP[t.stop], prev = t.stop ? TRIP[t.stop - 1].need : 0;
+  const pct = Math.round((t.fuel - prev) / (next.need - prev) * 100);
+  return `<button class="tripbar" id="goTrip"><img src="img/sticker/rocket.webp" alt="" width="36" height="36">
+    <span style="flex:1;min-width:0"><b>${stkById(next.id).ko}까지</b> <span class="note num">문제 ${next.need - t.fuel}개 남음</span>
+    <span class="gauge exp"><i style="width:${pct}%"></i></span></span>${stkImg(stkById(next.id), 36)}</button>`;
+}
+function tripView(){
+  const t = S.trip;
+  const rows = [{ id:'earth', need:0 }, ...TRIP].map((s, i) => {
+    const st = stkById(s.id), done = i <= t.stop, here = i === t.stop;
+    return `<div class="tstop ${done ? 'done' : ''}">${stkImg(st, 56)}<span><b>${esc(st.ko)}</b><small>${i === 0 ? '출발' : done ? '도착했어요!' : `연료 ${s.need}`}</small></span>${here ? '<img class="trocket" src="img/sticker/rocket.webp" alt="지금 여기" width="48" height="48">' : ''}</div>`;
+  }).join('');
+  $('#view').innerHTML = `<div class="card" style="display:flex;flex-direction:column;gap:12px">
+    <div class="row"><h2 style="font-size:24px">우주 탐험 여행</h2><span class="note" style="margin-left:auto">완주 ${t.laps}번 · 연료 ${t.fuel}</span></div>
+    <p class="note" style="margin:0">문제 하나를 맞힐 때마다 로켓 연료가 1씩 채워져요. 배움터 개념 카드는 3, 백과 퀴즈와 받아쓰기는 1이에요.</p>
+    <div class="track">${rows}</div>
+    <button class="btn block" id="back">돌아가기</button></div>`;
+  $('#back').onclick = home;
+}
+
+// ───── 오늘의 미션 ─────
+// 날짜로 3개를 고른다(첫 번째는 늘 문제 풀기). 다 하면 선물: 스티커 1장(하루 한도 안에서) + 도토리 배부름 +10. 돈은 주지 않는다
+const MISSIONS = [
+  { id:'solve5',  key:'solve',  n:5,  text:'문제 5개 맞히기' },
+  { id:'solve10', key:'solve',  n:10, text:'문제 10개 맞히기' },
+  { id:'learn',   key:'learn',  n:1,  text:'배움터 개념 카드 1개 끝내기' },
+  { id:'ox',      key:'ox',     n:2,  text:'백과 O/X 퀴즈 2개 풀기' },
+  { id:'game',    key:'game',   n:1,  text:'게임 1판 하기' },
+  { id:'dict',    key:'dict',   n:1,  text:'받아쓰기 1번 하기' },
+  { id:'review',  key:'review', n:3,  text:'오답노트 문제 3개 맞히기' },
+  { id:'pat',     key:'pat',    n:1,  text:'도토리 쓰다듬어 주기' },
+];
+function todayMissions(){
+  const d = daily();
+  if (!d.missions) {
+    const k = dayNum(today()), rest = MISSIONS.slice(2).filter((m) => m.key !== 'review' || S.wrong.length >= 3);
+    const a = rest[k % rest.length], b = rest[(k * 7 + 3) % rest.length];
+    d.missions = [MISSIONS[k % 2].id, a.id, (b.id === a.id ? rest[(k + 1) % rest.length] : b).id]; save();
+  }
+  d.m = d.m || {};
+  return d.missions.map((id) => { const m = MISSIONS.find((x) => x.id === id); return Object.assign({ have:Math.min(m.n, d.m[m.key] || 0) }, m); });
+}
+function mission(key, n = 1){
+  const d = daily(); d.m = d.m || {}; const before = todayMissions().every((m) => m.have >= m.n);
+  d.m[key] = (d.m[key] || 0) + n; save();
+  if (!before && todayMissions().every((m) => m.have >= m.n) && !d.gift) setTimeout(() => toast('오늘의 미션을 모두 해냈어요! 첫 화면에서 선물을 받아요.'), 1200);
+}
+function missionHTML(){
+  const ms = todayMissions(), all = ms.every((m) => m.have >= m.n), d = daily();
+  return `<div class="card mission"><div class="row"><span class="eyebrow">오늘의 미션</span><span class="note" style="margin-left:auto">${ms.filter((m) => m.have >= m.n).length} / 3</span></div>
+    ${ms.map((m) => `<div class="mrow ${m.have >= m.n ? 'done' : ''}"><span class="mchk">${m.have >= m.n ? '✓' : ''}</span><span>${esc(m.text)}</span><span class="note num" style="margin-left:auto">${m.have}/${m.n}</span></div>`).join('')}
+    ${all ? (d.gift ? '<p class="note center" style="margin:0">오늘 선물은 받았어요. 내일 또 만나요!</p>' : '<button class="btn coin block" id="mGift">미션 선물 받기</button>') : ''}
+    ${tripHTML()}</div>`;
+}
+function missionGift(){
+  const d = daily(); if (d.gift) return; d.gift = true;
+  S.pet.full = Math.min(100, S.pet.full + 10); save();
+  const p = grantSticker();
+  if (!p) toast(`${PET_NAME} 배부름 +10! (오늘 스티커는 다 받았어요)`); else toast(`${PET_NAME} 배부름 +10!`);
+  home();
+}
+
+// ───── 도토리 쓰다듬기 ─────
+function petPat(bubble){
+  const mood = petMood();
+  const lines = ['헤헤, 간지러워!', '좋아요! 또 쓰다듬어 줘!', '우와, 기분 최고!', '오늘도 같이 공부하자!', '도토리 먹고 싶다… 헤헤', '나 조금 컸지?'];
+  const line = mood === 'hungry' ? '배고파요… 꼬르륵!' : mood === 'sleepy' ? '음냐… 쓰다듬어 주니까 더 졸려요' : pick(lines.filter((x) => !bubble || x !== bubble.textContent)); // 바로 전 말은 빼고
+  if (bubble) bubble.textContent = line;
+  const el = document.querySelector('#rstage .rpet');
+  if (el) { el.classList.remove('hop'); void el.offsetWidth; el.classList.add('hop'); }
+  sfx('tap'); mission('pat');
+}
+
+// ───── 받아쓰기 ─────
+// 폰의 읽어 주기(speechSynthesis, 한국어)로 문장을 들려준다. 없으면 부모님이 읽어 주도록 문장 보기를 연다
+function speak(text, slow){
+  try {
+    const u = new SpeechSynthesisUtterance(text); u.lang = 'ko-KR'; u.rate = slow ? 0.6 : 0.85;
+    const v = speechSynthesis.getVoices().find((x) => /^ko/i.test(x.lang)); if (v) u.voice = v;
+    speechSynthesis.cancel(); speechSynthesis.speak(u); return true;
+  } catch (e) { return false; }
+}
+const canSpeak = () => 'speechSynthesis' in window;
+function dictSets(){
+  const own = (S.settings.dictCustom || '').split('\n').map((x) => x.trim()).filter(Boolean);
+  return (own.length ? [{ id:'own', name:'우리 반 받아쓰기 (부모님이 넣은 문장)', lines:own }] : []).concat(LD.DICT_SETS);
+}
+function dictView(){
+  $('#view').innerHTML = `<div class="card" style="display:flex;flex-direction:column;gap:10px">
+    <h2 style="font-size:24px">받아쓰기 연습</h2>
+    <p class="note" style="margin:0">폰이 문장을 읽어 주면 듣고 그대로 써요. 띄어쓰기와 문장 부호(. ? !)도 채점해요.</p>
+    ${canSpeak() ? '' : '<p class="note" style="margin:0"><b>이 폰은 읽어 주기가 안 돼요.</b> 엄마·아빠가 문장을 읽어 주세요.</p>'}
+    <div class="llist">${dictSets().map((s) => `<button class="lrow" style="--c:var(--kor)" data-dset="${s.id}"><span><span class="disp">${esc(s.name)}</span><small>${s.lines.length}문장${S.dict.best[s.id] != null ? ` · 최고 ${S.dict.best[s.id]}점` : ''}</small></span></button>`).join('')}</div>
+    <p class="note" style="margin:0">학교 받아쓰기 문장은 부모님 메뉴에서 넣을 수 있어요.</p>
+    <button class="btn block" id="back">배움터로</button></div>`;
+  $('#view').querySelectorAll('[data-dset]').forEach((b) => b.onclick = () => dictPlay(b.dataset.dset));
+  $('#back').onclick = () => learnView();
+}
+// 틀린 곳 표시: 글자 단위 LCS로 정답과 비교해 정답에서 빠지거나 다른 글자를 빨갛게
+function dictDiff(ans, mine){
+  const a = [...ans], b = [...mine], n = a.length, m = b.length, L = Array.from({ length:n + 1 }, () => new Array(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i][j] = a[i] === b[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  let i = 0, j = 0, out = '';
+  while (i < n) { if (j < m && a[i] === b[j]) { out += esc(a[i]); i++; j++; } else if (j < m && L[i][j + 1] >= L[i + 1][j]) j++; else { out += `<mark>${a[i] === ' ' ? '␣' : esc(a[i])}</mark>`; i++; } }
+  return out;
+}
+function dictPlay(setId){
+  const set = dictSets().find((s) => s.id === setId), lines = set.lines.slice(0, 10);
+  let i = 0, right = 0; const norm = (s) => s.replace(/\s+/g, ' ').trim();
+  const show = () => {
+    const line = lines[i];
+    $('#view').innerHTML = `<div class="card" style="display:flex;flex-direction:column;gap:12px">
+      <div class="qhead"><span>받아쓰기 · ${esc(set.name)}</span><span style="margin-left:auto" class="num">${i + 1} / ${lines.length}</span></div>
+      <div class="bar"><i style="width:${i / lines.length * 100}%"></i></div>
+      <div class="grid2"><button class="btn primary" id="say">🔊 듣기</button><button class="btn" id="slow">🐢 천천히</button></div>
+      <input id="dIn" class="dict-in" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="들은 문장을 써요" aria-label="받아쓰기 입력">
+      <button class="btn coin block" id="chk">확인</button>
+      <div id="dfb"></div>
+      <details class="note"><summary>부모님이 읽어 줄 때: 문장 보기</summary><p style="margin:6px 0 0">${esc(line)}</p></details>
+      <button class="btn ghost block" id="quitD">그만하기</button></div>`;
+    $('#say').onclick = () => { if (!speak(line)) toast('읽어 주기가 안 돼요. 부모님이 읽어 주세요.'); };
+    $('#slow').onclick = () => { if (!speak(line, true)) toast('읽어 주기가 안 돼요. 부모님이 읽어 주세요.'); };
+    $('#quitD').onclick = dictView;
+    $('#chk').onclick = () => {
+      const mine = norm($('#dIn').value); if (!mine) return toast('먼저 써 봐요!');
+      const ok = mine === norm(line), onlySpace = !ok && mine.replace(/\s/g, '') === line.replace(/\s/g, '');
+      if (ok) { right++; tripAdd(1); }
+      sfx(ok ? 'ok' : 'no');
+      $('#dIn').disabled = true; $('#chk').remove();
+      $('#dfb').innerHTML = `<div class="feedback ${ok ? 'ok' : 'no'}"><span class="disp">${ok ? '딩동댕! 완벽해요!' : onlySpace ? '띄어쓰기만 달라요!' : '아쉬워요!'}</span>
+        ${ok ? '' : `<span>정답: <span class="dans">${dictDiff(norm(line), mine)}</span></span><span class="note">빨간 곳을 다시 봐요. ␣는 띄어 써야 하는 곳이에요.</span>`}</div>
+        <button class="btn primary block" id="dNext">${i + 1 < lines.length ? '다음 문장' : '결과 보기'}</button>`;
+      $('#dNext').onclick = () => { i++; i < lines.length ? show() : finish(); };
+    };
+    $('#dIn').addEventListener('keydown', (e) => { if (e.key === 'Enter' && $('#chk')) $('#chk').click(); });
+    setTimeout(() => speak(line), 300);
+  };
+  const finish = () => {
+    const score = Math.round(right / lines.length * 100), b = S.dict.best[setId], nb = b == null || score > b;
+    if (nb) S.dict.best[setId] = score; save(); mission('dict'); markAttend();
+    if (score === 100) grantSticker();
+    $('#view').innerHTML = `<div class="card center" style="display:flex;flex-direction:column;gap:10px;align-items:center">
+      <div class="eyebrow">${esc(set.name)}</div><div class="big-num">${score}점</div>
+      <p>${lines.length}문장 중 ${right}문장을 맞혔어요.${nb ? ' 새 최고 점수!' : ''}</p>
+      ${score === 100 ? '<p><b>100점! 스티커 선물을 받았어요.</b></p>' : '<p class="note">틀린 문장은 다시 한번 연습해 봐요.</p>'}
+      <button class="btn primary block" id="again">다시 하기</button><button class="btn block" id="toD">받아쓰기 목록</button></div>`;
+    if (score === 100) sfx('win');
+    $('#again').onclick = () => dictPlay(setId); $('#toD').onclick = dictView;
+  };
+  show();
 }
 
 // ───── 배움터 ─────
@@ -940,10 +1151,12 @@ function learnView(tab){
   $('#view').innerHTML = `<div class="card" style="display:flex;flex-direction:column;gap:12px">
     <div class="row"><h2 style="font-size:24px">배움터</h2><span class="note" style="margin-left:auto">개념 ${doneN}/${LD.LESSONS.length} · 백과 퀴즈 ${oxN}/${STK().length}</span></div>
     <div class="chips" role="tablist">${[['lesson','교과 개념'], ['space','우주 백과'], ['animal','동물 백과']].map(([k, n]) => `<button class="chip" role="tab" data-ltab="${k}" aria-pressed="${LV.tab === k}">${n}</button>`).join('')}</div>
+    <button class="lrow" style="--c:var(--kor)" id="goDict"><span><span class="disp">받아쓰기 연습</span><small>폰이 읽어 주는 문장을 듣고 써요</small></span></button>
     ${r ? `<p class="note" style="margin:0">${LV.tab === 'lesson' ? `카드를 다 보고 확인 문제를 모두 맞히면 처음 한 번 ${won(r)}!` : `O/X 퀴즈를 처음 맞히면 ${won(Math.floor(r / 2))}!`}</p>` : ''}
     ${body}
     <button class="btn block" id="back">돌아가기</button></div>`;
   $('#view').querySelectorAll('[data-ltab]').forEach((b) => b.onclick = () => learnView(b.dataset.ltab));
+  $('#goDict').onclick = dictView;
   $('#view').querySelectorAll('[data-lesson]').forEach((b) => b.onclick = () => lessonView(b.dataset.lesson));
   $('#view').querySelectorAll('[data-book]').forEach((b) => b.onclick = () => bookView(b.dataset.book));
   $('#back').onclick = home;
@@ -981,7 +1194,7 @@ function lessonCheck(id){
   const finish = () => {
     const all = right === qs.length, first = all && !S.learn.done[id];
     let paid = 0;
-    if (all) { if (first) { S.learn.done[id] = today(); save(); paid = learnPay(S.settings.learnReward, l.title); } }
+    if (all) { if (first) { S.learn.done[id] = today(); save(); paid = learnPay(S.settings.learnReward, l.title); } mission('learn'); tripAdd(3); }
     markAttend();
     $('#view').innerHTML = `<div class="card center" style="display:flex;flex-direction:column;gap:10px;align-items:center">
       <div class="eyebrow">${esc(l.title)}</div><div class="big-num">${right} / ${qs.length}</div>
@@ -1011,7 +1224,7 @@ function bookView(id){
     $('#view').querySelectorAll('[data-ox]').forEach((x) => { x.disabled = true; if ((x.dataset.ox === '1') === b.ox.o) x.classList.add('ok'); else x.classList.add('no'); });
     let paid = 0;
     if (ok && !S.learn.ox[id]) { S.learn.ox[id] = today(); save(); paid = learnPay(Math.floor(S.settings.learnReward / 2), `${st.ko} 백과`); }
-    sfx(ok ? 'ok' : 'no');
+    sfx(ok ? 'ok' : 'no'); mission('ox'); if (ok) tripAdd(1);
     $('#oxfb').innerHTML = `<div class="feedback ${ok ? 'ok' : 'no'}"><span class="disp">${ok ? '딩동댕!' : '아쉬워요!'} 정답은 ${b.ox.o ? 'O' : 'X'}</span><span>${esc(b.ox.why)}</span>${paid ? `<b>+${won(paid)} 적립</b>` : ''}</div>`;
   });
   $('#bprev').onclick = () => bookView(list[idx - 1].id);
@@ -1069,8 +1282,11 @@ function roomEdit(sel){
   const tabs = [['shop','가구 가게'], ['mine','내 가구'], ['wall','벽지·바닥']];
   let panel = '';
   if (RE.tab === 'shop') {
-    panel = `<div class="chips">${RD.CATS.filter((c) => c.id !== 'special' || RD.ITEMS.some((x) => x.cat === 'special')).map((c) => `<button class="chip" data-cat="${c.id}" aria-pressed="${RE.cat === c.id}">${c.name}</button>`).join('')}</div>
-      <div class="rshop">${RD.ITEMS.filter((x) => x.cat === RE.cat).map((it) => { const n = r.owned[it.id] || 0;
+    const shown = (it) => !it.months || it.months.includes(new Date().getMonth() + 1) || r.owned[it.id]; // 계절 한정은 그 달에만
+    const cats = RD.CATS.filter((c) => RD.ITEMS.some((x) => x.cat === c.id && shown(x)));
+    if (!cats.some((c) => c.id === RE.cat)) RE.cat = cats[0].id;
+    panel = `<div class="chips">${cats.map((c) => `<button class="chip" data-cat="${c.id}" aria-pressed="${RE.cat === c.id}">${c.id === 'season' ? '🎃🎄 ' : ''}${c.name}</button>`).join('')}</div>
+      <div class="rshop">${RD.ITEMS.filter((x) => x.cat === RE.cat && shown(x)).map((it) => { const n = r.owned[it.id] || 0;
         return `<button class="rsitem" data-buy="${it.id}"><span class="rsimg"><img src="${RD.itemSrc(it)}" data-room="${esc(it.name)}" alt=""></span><b>${esc(it.name)}</b><small class="num">${won(it.price)}${n ? ` · ${n}개 있음` : ''}</small></button>`; }).join('')}</div>
       <p class="note">사면 바로 방에 놓여요. 같은 가구를 여러 개 살 수도 있어요.</p>`;
   } else if (RE.tab === 'mine') {
@@ -1190,15 +1406,28 @@ async function drawRoom(){
   x.fillStyle = '#1f6f5c'; x.font = '40px Jua, sans-serif'; x.textAlign = 'center'; x.fillText(`${S.settings.name ? josa(S.settings.name, '이', '가') : '내가'} 꾸민 ${PET_NAME}네 방`, W / 2, H - 50);
   return c;
 }
+// 캔버스를 PNG 파일로 휴대폰에 저장 (안드로이드 크롬은 '다운로드' 폴더 → 갤러리에서 보임)
+function savePng(c, name){
+  try {
+    c.toBlob((blob) => {
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+      document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+      toast('휴대폰에 저장했어요! 사진첩이나 다운로드 폴더에서 볼 수 있어요.');
+    }, 'image/png');
+  } catch (e) { toast('저장이 안 되면 사진을 길게 눌러 저장해 주세요.'); }
+}
+const stamp = () => today().replace(/-/g, '');
 async function roomPhoto(){
   toast('사진 찍는 중…');
   const c = await drawRoom(); const url = c.toDataURL('image/png');
   $('#view').innerHTML = `<div class="card" style="display:flex;flex-direction:column;gap:12px">
     <img class="cert-img" src="${url}" alt="${PET_NAME}네 방 사진">
-    <button class="btn coin block" id="share">엄마·아빠께 보내기</button>
+    <div class="grid2"><button class="btn primary" id="savePic">휴대폰에 저장</button><button class="btn coin" id="share">엄마·아빠께 보내기</button></div>
     <p class="note center" id="shareNote">버튼이 안 되면 사진을 길게 눌러 저장해요.</p>
     <button class="btn block" id="back">방 꾸미기로</button></div>`;
-  sfx('win'); $('#back').onclick = () => roomEdit();
+  sfx('win'); toast('찰칵! 사진을 찍었어요.');
+  $('#savePic').onclick = () => savePng(c, `dotori-room-${stamp()}.png`);
+  $('#back').onclick = () => roomEdit();
   $('#share').onclick = async () => {
     try { const blob = await new Promise((r) => c.toBlob(r, 'image/png')); const file = new File([blob], 'dotori-room.png', { type:'image/png' });
       if (navigator.canShare && navigator.canShare({ files:[file] })) { await navigator.share({ files:[file], title:`${PET_NAME}네 방` }); return; } throw new Error('no share');
@@ -1245,6 +1474,7 @@ function gameStart(){
 function gameEnd({ id, title, lines, amt = 0, label, again, sticker = false }){
   const g = GAMES.find((x) => x.id === id), s = S.settings, d = daily(); d.games = d.games || {};
   let msg = '';
+  mission('game');
   if (sticker) { const p = grantSticker(); lines = lines.concat(p ? `스티커 ${josa(p.ko, '을', '를')} 받았어요!` : '멋진 기록! (오늘 스티커는 다 받았어요)'); }
   if (g.paid) {
     if (gamesLeft(id) === 0) { msg = `오늘 ${g.name} 적립은 다 했어요. 기록 도전은 계속할 수 있어요!`; amt = 0; }
@@ -1479,9 +1709,10 @@ async function cert(){
   const c = await drawCert(); const url = c.toDataURL('image/png');
   $('#view').innerHTML = `<div class="card" style="display:flex;flex-direction:column;gap:12px">
     <img class="cert-img" src="${url}" alt="${S.settings.name ? esc(S.settings.name) + '의 ' : ''}목표 달성 칭찬 카드, 잔액 ${won(S.balance)}">
-    <button class="btn coin block" id="share">카톡·문자로 보내기</button>
+    <div class="grid2"><button class="btn primary" id="savePic">휴대폰에 저장</button><button class="btn coin" id="share">카톡·문자로 보내기</button></div>
     <p class="note center" id="shareNote">버튼이 안 되면 이 화면을 캡처해서 엄마·아빠께 카톡으로 보내요.</p>
     <button class="btn block" id="back">처음으로</button></div>`;
+  $('#savePic').onclick = () => savePng(c, `chukchuk-card-${stamp()}.png`);
   $('#back').onclick = home;
   $('#share').onclick = async () => {
     try {
@@ -1601,9 +1832,10 @@ async function reportImage(){
   const c = await drawReport(); const url = c.toDataURL('image/png');
   $('#view').innerHTML = `<div class="card" style="display:flex;flex-direction:column;gap:12px">
     <img class="cert-img" src="${url}" alt="이번 주 학습 리포트">
-    <button class="btn coin block" id="share">카톡·문자로 보내기</button>
+    <div class="grid2"><button class="btn primary" id="savePic">휴대폰에 저장</button><button class="btn coin" id="share">카톡·문자로 보내기</button></div>
     <p class="note center" id="shareNote">버튼이 안 되면 이미지를 길게 눌러 저장해요.</p>
     <button class="btn block" id="back">부모님 메뉴로</button></div>`;
+  $('#savePic').onclick = () => savePng(c, `chukchuk-report-${stamp()}.png`);
   $('#back').onclick = parent;
   $('#share').onclick = async () => {
     try { const blob = await new Promise((r) => c.toBlob(r, 'image/png')); const file = new File([blob], 'chukchuk-report.png', { type:'image/png' });
@@ -1671,6 +1903,7 @@ function parent(){
       ${f('sGoal', '목표 금액(원) — 채우면 칭찬 카드', s.goal)}
       ${f('sPetCap', '펫 먹이·방꾸미기에 하루 쓸 수 있는 돈(원)', s.petCap)}
       ${f('sGameCap', '하루 게임 판수 (0이면 제한 없음)', s.gameCap)}
+      <div class="field"><label for="sDict">받아쓰기 문장 (학교 급수표 문장을 한 줄에 하나씩, 10개까지 연습해요)</label><textarea id="sDict" rows="5" placeholder="예) 꽃이 활짝 피었습니다.">${esc(s.dictCustom || '')}</textarea></div>
       ${f('sLearn', '배움터 보상(원) — 개념 카드 처음 통과, 백과 퀴즈는 절반 (0이면 없음)', s.learnReward)}
       ${f('sPin', '부모 비밀번호(숫자 4자리)', s.pin, 'text', 'inputmode="numeric" maxlength="4" pattern="[0-9]{4}"')}
       <hr><h3 style="font-size:20px">AI 친구 연결</h3>
@@ -1710,7 +1943,7 @@ function parent(){
   $('#bonus').onclick = () => { const a = n('bonusAmt'); if (!a) return toast('보너스 금액을 넣어 주세요'); const why = v('bonusWhy').trim(); S.balance += a; addLedger(why ? `칭찬 보너스: ${why}` : '칭찬 보너스', a); save(); renderBook(); toast(won(a) + ' 넣었어요'); parent(); };
   $('#saveS').onclick = () => {
     const pin = v('sPin'); if (!/^\d{4}$/.test(pin)) return toast('비밀번호는 숫자 4자리예요');
-    Object.assign(s, { name:v('sName').trim(), grade:+v('sGrade'), sem:+v('sSem'), review:$('#sReview').checked, reward:{1:n('r1'),2:n('r2'),3:n('r3')}, comboBonus:n('sCombo'), penalty:n('sPen'), dailyCap:n('sCap'), goal:n('sGoal', 100), petCap:n('sPetCap'), gameCap:n('sGameCap'), learnReward:n('sLearn'), pin, aiUrl:v('sAiUrl').trim(), aiToken:v('sAiTok').trim(), aiDaily:n('sAiDaily'), likes:v('sLikes').trim() });
+    Object.assign(s, { name:v('sName').trim(), grade:+v('sGrade'), sem:+v('sSem'), review:$('#sReview').checked, reward:{1:n('r1'),2:n('r2'),3:n('r3')}, comboBonus:n('sCombo'), penalty:n('sPen'), dailyCap:n('sCap'), goal:n('sGoal', 100), petCap:n('sPetCap'), gameCap:n('sGameCap'), learnReward:n('sLearn'), dictCustom:v('sDict').split('\n').map((x) => x.trim()).filter(Boolean).slice(0, 30).join('\n'), pin, aiUrl:v('sAiUrl').trim(), aiToken:v('sAiTok').trim(), aiDaily:n('sAiDaily'), likes:v('sLikes').trim() });
     save(); renderBook(); toast('저장했어요');
   };
   $('#repImg').onclick = reportImage;
