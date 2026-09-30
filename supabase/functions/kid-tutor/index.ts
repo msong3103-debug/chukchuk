@@ -44,6 +44,48 @@ const HINT = `
 - 계산 문제면 식을 세우는 방법이나 비슷한 쉬운 예를 들어 줘.
 `.trim();
 
+// ───── 놀이 모드 (모두 BASE 안전 규칙 위에 덧붙인다) ─────
+const GREET = `
+지금은 "척척이의 아침 인사"야. 아래에 아이의 요즘 기록이 있어.
+- 1~2문장으로 반갑게 먼저 말을 걸어. 기록 가운데 하나를 골라 칭찬하거나 응원해 줘.
+- 마지막에 오늘 같이 해 볼 것을 하나 제안해 (예: 문제 풀기, 이야기 짓기, 열고개).
+- 기록에 없는 일은 지어내지 마. 개인 정보는 묻지 마.
+`.trim();
+
+const TWENTY = (secret: string, kind: string) => `
+지금은 "열고개" 놀이야. 네가 마음속으로 생각한 것은 "${secret}"(${kind})이야. 아이가 질문해서 맞히는 놀이야.
+- 아이가 예/아니요로 답할 수 있는 질문을 하면 "네!" 또는 "아니요!"로 먼저 답하고, 짧은 한 문장만 덧붙여.
+- 덧붙이는 말은 정답을 바로 알 수 있을 만큼 큰 힌트가 되면 안 돼.
+- 절대로 "${secret}"라는 이름을 말하거나 글자로 쓰지 마. 이름의 일부도 말하지 마.
+- 잘 모르거나 애매한 질문이면 "음, 조금 그래요"처럼 솔직하게 답해.
+- 아이가 이름을 정확히 말하면 "정답이야!"라고 크게 칭찬해.
+- 사실이 확실하지 않으면 지어내지 말고 "그건 척척이도 헷갈려요"라고 말해.
+`.trim();
+
+const STORY = (words: string[], end: boolean) => `
+지금은 "같이 이야기 짓기" 놀이야. 이야기 낱말: ${words.join(", ")}
+- 아이와 번갈아 가며 짧은 동화를 지어. 네 차례에는 2~3문장만 써.
+- 아이가 쓴 줄을 이어받아 자연스럽게 이어 가고, 아이의 생각을 칭찬해 줘.
+- 무섭거나 폭력적이거나 슬픈 내용은 넣지 말고 따뜻하고 신나는 이야기로 만들어.
+${end ? '- 이제 이야기를 2~3문장으로 행복하게 마무리하고, 맨 마지막 줄에 "제목: ..." 형식으로 이야기 제목을 붙여.' : '- 네 차례 끝에는 "다음엔 어떻게 될까?"처럼 아이 차례를 물어봐.'}
+`.trim();
+
+const DIARY = `
+지금은 "한 줄 일기 답장"이야. 아이가 오늘 있었던 일을 일기로 한 줄 썼어.
+- 2~3문장으로 다정하게 답장해. 아이의 마음을 알아주고 잘한 점을 칭찬해.
+- 질문은 하나까지만. 오래 붙잡지 마.
+`.trim();
+
+const cleanMsgs = (list: unknown, keep: number) => {
+  const arr = Array.isArray(list) ? list.slice(-keep) : [];
+  const out = arr
+    .filter((m: any) => (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
+    .map((m: any) => ({ role: m.role as "user" | "assistant", content: m.content.slice(0, 300) }));
+  while (out.length && out[0].role !== "user") out.shift();
+  return out;
+};
+const short = (v: unknown, n: number) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, n);
+
 function bad(status: number, msg: string) {
   return new Response(JSON.stringify({ error: msg }), { status, headers: { ...CORS, "content-type": "application/json" } });
 }
@@ -78,15 +120,30 @@ Deno.serve(async (req) => {
       "이 문제에 대한 힌트를 줘.",
     ].filter(Boolean);
     messages = [{ role: "user", content: lines.join("\n") }];
+  } else if (body.mode === "greet") {
+    system += "\n\n" + GREET;
+    const ctx = (Array.isArray(body.ctx) ? body.ctx : []).slice(0, 6).map((c: unknown) => "- " + short(c, 80)).filter((c: string) => c.length > 2);
+    messages = [{ role: "user", content: "아이의 요즘 기록:\n" + (ctx.join("\n") || "- 오늘 처음 만났어요") }];
+  } else if (body.mode === "twenty") {
+    const secret = short(body.secret, 20), kind = short(body.kind, 10) || "동물";
+    if (!secret) return bad(400, "no secret");
+    system += "\n\n" + TWENTY(secret, kind);
+    messages = cleanMsgs(body.messages, 22);
+  } else if (body.mode === "story") {
+    const words = (Array.isArray(body.words) ? body.words : []).slice(0, 3).map((w: unknown) => short(w, 10)).filter(Boolean);
+    if (!words.length) return bad(400, "no words");
+    system += "\n\n" + STORY(words, !!body.end);
+    messages = cleanMsgs(body.messages, 12);
+  } else if (body.mode === "diary") {
+    system += "\n\n" + DIARY;
+    const text = short(body.text, 200);
+    if (!text) return bad(400, "no diary");
+    messages = [{ role: "user", content: text }];
   } else {
     system += "\n\n" + CURIOUS(grade);
-    const list = Array.isArray(body.messages) ? body.messages.slice(-8) : [];
-    messages = list
-      .filter((m: any) => (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
-      .map((m: any) => ({ role: m.role, content: m.content.slice(0, 300) }));
-    while (messages.length && messages[0].role !== "user") messages.shift();
-    if (!messages.length || messages[messages.length - 1].role !== "user") return bad(400, "no question");
+    messages = cleanMsgs(body.messages, 8);
   }
+  if (!messages.length || messages[messages.length - 1].role !== "user") return bad(400, "no question");
 
   const key = Deno.env.get("ANTHROPIC_API_KEY");
   if (!key) return bad(500, "server key missing");

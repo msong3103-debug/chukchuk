@@ -144,5 +144,60 @@
   ];
   const stickerSrc = (st) => (st.set === 'planet' ? `img/planet/${st.id}.webp` : `img/sticker/${st.id}.webp`);
 
-  window.GameData = { PLANETS, planetSVG, WORDS, wordTiles, speedQ, STICKER_SETS, STICKERS, stickerSrc };
+  // ───── 코딩 놀이 ─────
+  // 5×5 칸. S 출발(도토리) · G 도착(도토리 열매) · # 돌 · * 별(모두 모아야 도착 인정) · . 빈칸
+  // slots: 놓을 수 있는 명령 칸 수, repeat: 반복(한 명령을 2~4번) 쓸 수 있는 단계
+  const CODE_LEVELS = [
+    { name:'첫 걸음',       slots:3, repeat:false, map:['.....', '.....', 'S.G..', '.....', '.....'] },
+    { name:'위로 쭉',       slots:5, repeat:false, map:['G....', '.....', '.....', '.....', 'S....'] },
+    { name:'모퉁이 돌기',   slots:7, repeat:false, map:['.....', '...G.', '.....', '.....', 'S....'] },
+    { name:'돌 피하기',     slots:5, repeat:false, map:['.....', '..G..', '..#..', '..S..', '.....'] },
+    { name:'돌담 넘어',     slots:10, repeat:false, map:['S.#..', '..#.G', '..#..', '.....', '.....'] },
+    { name:'별 줍기',       slots:9, repeat:false, map:['.*...', '.....', 'S...G', '.....', '.....'] },
+    { name:'반복은 힘이 세', slots:2, repeat:true, map:['....G', '.....', '.....', '.....', 'S....'] },
+    { name:'디귿 길',       slots:3, repeat:true, map:['.....', 'S....', '####.', 'G....', '.....'] },
+    { name:'꼬불꼬불',      slots:4, repeat:true, map:['G....', '####.', '.....', '.####', 'S....'] },
+    { name:'별길 여행',     slots:4, repeat:true, map:['S..*.', '####.', '*....', '.####', 'G....'] },
+  ];
+  const DIRS = { U:[0, -1], D:[0, 1], L:[-1, 0], R:[1, 0] };
+  function codeParse(lv) {
+    let start = null, goal = null; const stars = [];
+    lv.map.forEach((row, y) => [...row].forEach((c, x) => { if (c === 'S') start = [x, y]; if (c === 'G') goal = [x, y]; if (c === '*') stars.push([x, y]); }));
+    return { start, goal, stars, rock:(x, y) => x < 0 || y < 0 || y >= lv.map.length || x >= lv.map[0].length || lv.map[y][x] === '#' };
+  }
+  // 명령 실행: [{d:'R', n:2}, …] → 한 칸씩의 경로와 결과('goal' | 'crash' | 'nostar' | 'short')
+  function codeRun(lv, prog) {
+    const P = codeParse(lv); let [x, y] = P.start; const got = new Set(), path = [[x, y]];
+    const key = (a, b) => a + ',' + b;
+    for (const c of prog) for (let k = 0; k < c.n; k++) {
+      const nx = x + DIRS[c.d][0], ny = y + DIRS[c.d][1];
+      if (P.rock(nx, ny)) return { path, result:'crash', at:[nx, ny], got };
+      x = nx; y = ny; path.push([x, y]);
+      if (P.stars.some(([sx, sy]) => sx === x && sy === y)) got.add(key(x, y));
+      if (x === P.goal[0] && y === P.goal[1]) return { path, result:got.size === P.stars.length ? 'goal' : 'nostar', got };
+    }
+    return { path, result:'short', got };
+  }
+  // 가장 적은 명령 수 (너비 우선 탐색: 칸·모은 별 상태마다 명령 하나 = 한 방향으로 1칸, 반복 단계면 1~4칸)
+  function codeBest(lv) {
+    const P = codeParse(lv), maxN = lv.repeat ? 4 : 1, full = (1 << P.stars.length) - 1;
+    const starIdx = (x, y) => P.stars.findIndex(([sx, sy]) => sx === x && sy === y);
+    const start = [P.start[0], P.start[1], 0], seen = new Set([start.join()]); let q = [start];
+    for (let depth = 1; depth <= 20 && q.length; depth++) {
+      const nq = [];
+      for (const [x0, y0, m0] of q) for (const d of Object.keys(DIRS)) {
+        let x = x0, y = y0, m = m0;
+        for (let n = 1; n <= maxN; n++) {
+          x += DIRS[d][0]; y += DIRS[d][1]; if (P.rock(x, y)) break;
+          const si = starIdx(x, y); if (si >= 0) m |= 1 << si;
+          if (x === P.goal[0] && y === P.goal[1]) { if (m === full) return depth; break; } // 도착하면 거기서 멈춘다
+          const k = [x, y, m].join(); if (!seen.has(k)) { seen.add(k); nq.push([x, y, m]); }
+        }
+      }
+      q = nq;
+    }
+    return null;
+  }
+
+  window.GameData = { PLANETS, planetSVG, WORDS, wordTiles, speedQ, STICKER_SETS, STICKERS, stickerSrc, CODE_LEVELS, codeRun, codeBest, codeParse };
 })();
