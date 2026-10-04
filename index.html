@@ -342,9 +342,9 @@ h1,h2,h3,.disp{font-family:var(--display);font-weight:400;margin:0;text-wrap:bal
 .bstage{position:relative;width:100%;aspect-ratio:1;border-radius:var(--radius);overflow:hidden;border:2px solid var(--line);touch-action:none;user-select:none;-webkit-user-select:none}
 .bstar{position:absolute;width:4px;height:4px;border-radius:50%;background:#fff;opacity:.85}
 .bempty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;margin:0;color:rgba(0,0,0,.4);font-family:var(--display);font-size:18px;pointer-events:none;text-align:center;padding:16px}
-.bitem{position:absolute;cursor:grab}
-.bitem img,.bitem .stk-ph{display:block;width:100%;height:auto;pointer-events:none}
-.bitem.sel{outline:3px dashed var(--coin);outline-offset:3px;border-radius:8px;z-index:20}
+.bpiece{position:absolute;cursor:grab}
+.bpiece img,.bpiece .stk-ph{display:block;width:100%;height:auto;pointer-events:none}
+.bpiece.sel{outline:3px dashed var(--coin);outline-offset:3px;border-radius:8px;z-index:20}
 .btools{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 .btools button{min-height:48px;border-radius:12px;background:var(--panel2);border:1px solid var(--line);font-size:14px;box-shadow:var(--shadow)}
 .btools button.del{color:var(--bad)}
@@ -2044,7 +2044,7 @@ let BSEL = null;
 const bgOf = (id) => PD.BOARD_BG.find((x) => x.id === id) || PD.BOARD_BG[0];
 function boardItemHTML(it){
   const st = stkById(it.id); if (!st) return '';
-  return `<div class="bitem ${BSEL === it.u ? 'sel' : ''}" data-u="${it.u}" style="${boardItemStyle(it)}">${stkImg(st, 80)}</div>`;
+  return `<div class="bpiece ${BSEL === it.u ? 'sel' : ''}" data-u="${it.u}" style="${boardItemStyle(it)}">${stkImg(st, 80)}</div>`;
 }
 const boardItemStyle = (it) => `left:${it.x}%;top:${it.y}%;width:${20 * it.s}%;transform:translate(-50%,-50%) rotate(${it.r}deg) scaleX(${it.f ? -1 : 1})`;
 function boardView(){
@@ -2070,12 +2070,12 @@ function boardView(){
       else if (t === 'front') { b.items = b.items.filter((y) => y !== cur).concat(cur); }
       else if (t === 'del') { b.items = b.items.filter((y) => y !== cur); BSEL = null; }
       save(); sfx('tap');
-      if (t === 'front' || t === 'del') { stage.querySelectorAll('.bitem').forEach((e) => e.remove()); stage.insertAdjacentHTML('beforeend', b.items.map(boardItemHTML).join('')); $('#bcount').textContent = `${b.items.length} / ${BOARD_MAX}장`; }
-      else { const e = stage.querySelector(`.bitem[data-u="${cur.u}"]`); if (e) e.style.cssText = boardItemStyle(cur); }
+      if (t === 'front' || t === 'del') { stage.querySelectorAll('.bpiece').forEach((e) => e.remove()); stage.insertAdjacentHTML('beforeend', b.items.map(boardItemHTML).join('')); $('#bcount').textContent = `${b.items.length} / ${BOARD_MAX}장`; }
+      else { const e = stage.querySelector(`.bpiece[data-u="${cur.u}"]`); if (e) e.style.cssText = boardItemStyle(cur); }
       tools();
     });
   };
-  const mark = () => { stage.querySelectorAll('.bitem').forEach((e) => e.classList.toggle('sel', +e.dataset.u === BSEL)); tools(); };
+  const mark = () => { stage.querySelectorAll('.bpiece').forEach((e) => e.classList.toggle('sel', +e.dataset.u === BSEL)); tools(); };
   $('#view').querySelectorAll('[data-bg]').forEach((x) => x.onclick = () => { b.bg = x.dataset.bg; save(); boardView(); });
   $('#view').querySelectorAll('[data-add]').forEach((x) => x.onclick = () => {
     if (b.items.length >= BOARD_MAX) return toast('판이 가득 찼어요. 몇 개를 지워 볼까요?');
@@ -2086,7 +2086,7 @@ function boardView(){
   });
   let drag = null;
   stage.addEventListener('pointerdown', (e) => {
-    const el = e.target.closest('.bitem');
+    const el = e.target.closest('.bpiece');
     if (!el) { if (BSEL != null) { BSEL = null; mark(); } return; }
     e.preventDefault(); const it = itOf(+el.dataset.u); BSEL = it.u; mark();
     drag = { el, it, sx:e.clientX, sy:e.clientY, ox:it.x, oy:it.y, rect:stage.getBoundingClientRect() };
